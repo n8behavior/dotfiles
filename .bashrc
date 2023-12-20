@@ -163,3 +163,5 @@ if [ -d .secrets ]; then
 fi
 
 . "$HOME/.cargo/env"
+
+eval "$(starship init bash)"
