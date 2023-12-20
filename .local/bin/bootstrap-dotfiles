@@ -5,7 +5,7 @@ set -e
 install-common-packages()
 {
 	echo 'INSTALLING: common-packages'
-	sudo apt install -y powerline build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp &>/dev/null
+	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp fuse &>/dev/null
 	git lfs install &>/dev/null
 }
 
@@ -39,28 +39,14 @@ install-nvm()
 	nvm install-latest-npm
 }
 
-setup-vim()
+setup-editor()
 {
-	echo 'INSTALLING: Configuring VIM'
-	type -p curl >/dev/null || install-common-packages
-	type -p git >/dev/null || install-common-packages
-	type -p npm >/dev/null || install-nvm
-	# cd works 'cause start gets created last
-	mkdir -p ~/.vim/pack/default/{opt,start} && cd $_
-	local plugins=(
-	tpope/vim-sensible
-	ctrlpvim/ctrlp.vim
-	dhruvasagar/vim-table-mode
-	iamcco/markdown-preview.nvim.git
-	morhetz/gruvbox
-	rust-lang/rust.vim
-	dense-analysis/ale.git)
-	for p in ${plugins[*]}
-	do 
-		echo $p
-		git clone  https://github.com/$p ${p/\//_} &>/dev/null || git -C ${p/\//_} pull &>/dev/null 
-	done
-	sudo update-alternatives --set editor /usr/bin/vim.nox
+	echo 'INSTALLING: Neovim'
+	type -p gh >/dev/null || install-github-cli
+	gh release download --repo neovim/neovim --pattern *appimage
+	mv nvim.appimage .local/bin
+	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 60
+	sudo update-alternatives --auto editor
 }
 
 install-yubikey-manager()
@@ -82,7 +68,9 @@ type -p gh >/dev/null || install-github-cli
 type -p az >/dev/null || install-azure-cli
 [ -f ~/.nvm/nvm-exec ] || install-nvm
 type -p ykman >/dev/null || install-yubikey-manager
-#setup-vim #using neovim. Need setup for that
+setup-editor #using neovim. Need setup for that
 
 #switch to starship
 #echo -e "\n\nYou'll wants these fonts\n\thttps://github.com/powerline/fonts"
+
+source $HOME/.profile
