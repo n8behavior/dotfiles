@@ -45,6 +45,7 @@ setup-editor()
 	type -p gh >/dev/null || install-github-cli
 	gh release download --repo neovim/neovim --pattern *appimage
 	mv nvim.appimage .local/bin
+	chmod +x .local/bin/nvim.appimage
 	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 60
 	sudo update-alternatives --auto editor
 }
@@ -72,5 +73,3 @@ setup-editor #using neovim. Need setup for that
 
 #switch to starship
 #echo -e "\n\nYou'll wants these fonts\n\thttps://github.com/powerline/fonts"
-
-source $HOME/.profile
