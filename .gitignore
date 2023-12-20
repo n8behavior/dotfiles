@@ -4,6 +4,7 @@
 !.bash_logout
 !.bashrc
 !.config/gh/config.yml
+!.config/nvim/init.lua
 !.cvsignore
 !.gitconfig
 !.github/*
