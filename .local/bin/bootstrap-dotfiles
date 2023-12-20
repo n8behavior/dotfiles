@@ -58,6 +58,17 @@ install-yubikey-manager()
 	sudo apt install -y yubikey-manager &>/dev/null
 }
 
+setup-rust()
+{
+	type -p rustup &>/dev/null || {
+		echo "INSTALLING: Rust dev environment"
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+	}
+	echo "UPDATING: Rust tooling"
+	rustup update &>/dev/null
+	rustup component add rust-analyzer &>/dev/null
+}
+
 echo 'UPDATING: APT Repository Lists'
 sudo apt update &>/dev/null
 echo 'UPDATING: All Installed Packages'
@@ -66,10 +77,11 @@ echo 'INSTALLING: Baseline Packages'
 install-common-packages
 echo 'INSTALLING: Extra Goodies'
 type -p gh >/dev/null || install-github-cli
-type -p az >/dev/null || install-azure-cli
+#type -p az >/dev/null || install-azure-cli
 [ -f ~/.nvm/nvm-exec ] || install-nvm
 type -p ykman >/dev/null || install-yubikey-manager
-setup-editor #using neovim. Need setup for that
+setup-rust
+setup-editor
 
 #switch to starship
 #echo -e "\n\nYou'll wants these fonts\n\thttps://github.com/powerline/fonts"
