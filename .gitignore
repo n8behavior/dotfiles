@@ -6,7 +6,7 @@
 !.config/gh/config.yml
 !.cvsignore
 !.gitconfig
-!.github/README.md
+!.github/*
 !.gitignore
 !.local/bin/bootstrap-dotfiles
 !.local/etc/settings.json

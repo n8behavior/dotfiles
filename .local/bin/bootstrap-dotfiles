@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -e
+
+install-common-packages()
+{
+	echo 'INSTALLING: common-packages'
+	sudo apt install -y powerline build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp &>/dev/null
+	git lfs install &>/dev/null
+}
+
+install-azure-cli() 
+{
+	echo 'INSTALLING: Azure CLI'
+	type -p curl >/dev/null || install-common-packages
+	curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+	az cloud set --name AzureUSGovernment
+	az config set extension.use_dynamic_install=yes_without_prompt
+}
+
+install-github-cli()
+{
+	echo 'INSTALLING: GitHub CLI'
+	type -p curl >/dev/null || install-common-packages
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+	sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+	sudo apt install gh -y
+}
+
+install-nvm()
+{
+	echo 'INSTALLING: Node Version Manager'
+	type -p curl >/dev/null || install-common-packages
+	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash
+	export NVM_DIR="$HOME/.nvm"
+	[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+	nvm install --lts
+	nvm install-latest-npm
+}
+
+setup-vim()
+{
+	echo 'INSTALLING: Configuring VIM'
+	type -p curl >/dev/null || install-common-packages
+	type -p git >/dev/null || install-common-packages
+	type -p npm >/dev/null || install-nvm
+	# cd works 'cause start gets created last
+	mkdir -p ~/.vim/pack/default/{opt,start} && cd $_
+	local plugins=(
+	tpope/vim-sensible
+	ctrlpvim/ctrlp.vim
+	dhruvasagar/vim-table-mode
+	iamcco/markdown-preview.nvim.git
+	morhetz/gruvbox
+	rust-lang/rust.vim
+	dense-analysis/ale.git)
+	for p in ${plugins[*]}
+	do 
+		echo $p
+		git clone  https://github.com/$p ${p/\//_} &>/dev/null || git -C ${p/\//_} pull &>/dev/null 
+	done
+	sudo update-alternatives --set editor /usr/bin/vim.nox
+}
+
+install-yubikey-manager()
+{
+	echo 'INSTALLING: Yubikey Mangager'
+	type -p add-apt-repository &>/dev/null || install-common-packages
+	sudo add-apt-repository --yes ppa:yubico/stable &>/dev/null
+	sudo apt install -y yubikey-manager &>/dev/null
+}
+
+echo 'UPDATING: APT Repository Lists'
+sudo apt update &>/dev/null
+echo 'UPDATING: All Installed Packages'
+sudo apt dist-upgrade -y &>/dev/null
+echo 'INSTALLING: Baseline Packages'
+install-common-packages
+echo 'INSTALLING: Extra Goodies'
+type -p gh >/dev/null || install-github-cli
+type -p az >/dev/null || install-azure-cli
+[ -f ~/.nvm/nvm-exec ] || install-nvm
+type -p ykman >/dev/null || install-yubikey-manager
+#setup-vim #using neovim. Need setup for that
+
+#switch to starship
+#echo -e "\n\nYou'll wants these fonts\n\thttps://github.com/powerline/fonts"
