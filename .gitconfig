@@ -1,0 +1,34 @@
+[gpg]
+	program = gpg
+[user]
+	email = mike@thesandmans.com
+	name = Mike Sandman
+[commit]
+	gpgsign = true
+[core]
+	excludesfile = ~/.cvsignore
+[alias]
+	root = rev-parse --show-toplevel
+[push]
+	default = simple
+[submodule]
+	recurse = true
+[tag]
+	sort = -version:refname
+[init]
+	defaultBranch = main
+[clean]
+	requireForce = false
+[pull]
+	ff = only
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true

@@ -1,0 +1,16 @@
+*
+!.bash_aliases
+!.bash_functions
+!.bash_logout
+!.bashrc
+!.config/gh/config.yml
+!.cvsignore
+!.gitconfig
+!.github/README.md
+!.gitignore
+!.local/bin/bootstrap-dotfiles
+!.local/etc/settings.json
+!.profile
+!.selected_editor
+!.tmux.conf
+!.vimrc
