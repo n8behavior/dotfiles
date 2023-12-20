@@ -55,7 +55,11 @@ require("packer").startup(function(use)
   -- My standard stuff
   use("tpope/vim-sensible")
   use("ctrlpvim/ctrlp.vim")
+
+  -- AI-all-the-things
+  use("github/copilot.vim")
 end)
+vim.g.copilot_assume_mapped = true
 
 vim.cmd('colorscheme gruvbox')
 vim.o.number = true
