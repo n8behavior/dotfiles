@@ -5,36 +5,36 @@ set -e
 install-common-packages()
 {
 	echo 'INSTALLING: common-packages'
-	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp fuse &>/dev/null
-	git lfs install &>/dev/null
+	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp fuse 
+	git lfs install 
 }
 
 install-github-cli()
 {
 	echo 'INSTALLING: GitHub CLI'
-	type -p curl >/dev/null || install-common-packages
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg &>/dev/null
+	type -p curl || install-common-packages
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 
 	sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list &> /dev/null
-	sudo apt install gh -y &>/dev/null
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list 
+	sudo apt install gh -y 
 	gh auth login
 }
 
 install-nvm()
 {
 	echo 'INSTALLING: Node Version Manager'
-	type -p curl >/dev/null || install-common-packages
-	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash &>/dev/null
+	type -p curl || install-common-packages
+	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash 
 	export NVM_DIR="$HOME/.nvm"
-	[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" &>/dev/null
-	nvm install --lts &>/dev/null
-	nvm install-latest-npm &>/dev/null
+	[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" 
+	nvm install --lts 
+	nvm install-latest-npm 
 }
 
 setup-editor()
 {
 	echo 'INSTALLING: Neovim'
-	type -p gh >/dev/null || install-github-cli
+	type -p gh || install-github-cli
 	gh release download --repo neovim/neovim --pattern *appimage
 	mv nvim.appimage .local/bin
 	chmod +x .local/bin/nvim.appimage
@@ -45,14 +45,14 @@ setup-editor()
 install-yubikey-manager()
 { 
 	echo 'INSTALLING: Yubikey Mangager'
-	type -p add-apt-repository &>/dev/null || install-common-packages
-	sudo add-apt-repository --yes ppa:yubico/stable &>/dev/null
-	sudo apt install -y yubikey-manager &>/dev/null
+	type -p add-apt-repository || install-common-packages
+	sudo add-apt-repository --yes ppa:yubico/stable 
+	sudo apt install -y yubikey-manager 
 }
 
 setup-rust()
 {
-	type -p rustup &>/dev/null || {
+	type -p rustup || {
 		echo "INSTALLING: Rust dev environment"
 		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 	}
@@ -65,7 +65,7 @@ setup-rust()
 setup-terminal()
 {
 	dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
-	type -p starship &>/dev/null || {
+	type -p starship  || {
 		echo "INSTALLING: Starship cross-shell prompt"
 		curl -sS https://starship.rs/install.sh | sh
 	}
@@ -76,15 +76,15 @@ setup-terminal()
 
 
 echo 'UPDATING: APT Repository Lists'
-sudo apt update &>/dev/null
+sudo apt update 
 echo 'UPDATING: All Installed Packages'
-sudo apt dist-upgrade -y &>/dev/null
+sudo apt dist-upgrade -y 
 echo 'INSTALLING: Baseline Packages'
 install-common-packages
 echo 'INSTALLING: Extra Goodies'
-type -p gh >/dev/null || install-github-cli
+type -p gh || install-github-cli
 [ -f ~/.nvm/nvm-exec ] || install-nvm
-type -p ykman >/dev/null || install-yubikey-manager
+type -p ykman || install-yubikey-manager
 setup-rust
 setup-editor
 setup-terminal
