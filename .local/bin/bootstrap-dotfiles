@@ -57,9 +57,9 @@ setup-rust()
 		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 	}
 	echo "UPDATING: Rust tooling"
-	rustup update &>/dev/null
-	rustup component add rust-analyzer &>/dev/null
 	. "$HOME/.cargo/env"
+	rustup update
+	rustup component add rust-analyzer
 }
 
 setup-terminal()
