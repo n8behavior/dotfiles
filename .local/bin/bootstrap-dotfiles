@@ -9,34 +9,26 @@ install-common-packages()
 	git lfs install &>/dev/null
 }
 
-install-azure-cli() 
-{
-	echo 'INSTALLING: Azure CLI'
-	type -p curl >/dev/null || install-common-packages
-	curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-	az cloud set --name AzureUSGovernment
-	az config set extension.use_dynamic_install=yes_without_prompt
-}
-
 install-github-cli()
 {
 	echo 'INSTALLING: GitHub CLI'
 	type -p curl >/dev/null || install-common-packages
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg &>/dev/null
 	sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-	sudo apt install gh -y
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list &> /dev/null
+	sudo apt install gh -y &>/dev/null
+	gh auth login
 }
 
 install-nvm()
 {
 	echo 'INSTALLING: Node Version Manager'
 	type -p curl >/dev/null || install-common-packages
-	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash
+	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash &>/dev/null
 	export NVM_DIR="$HOME/.nvm"
-	[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-	nvm install --lts
-	nvm install-latest-npm
+	[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" &>/dev/null
+	nvm install --lts &>/dev/null
+	nvm install-latest-npm &>/dev/null
 }
 
 setup-editor()
@@ -67,14 +59,19 @@ setup-rust()
 	echo "UPDATING: Rust tooling"
 	rustup update &>/dev/null
 	rustup component add rust-analyzer &>/dev/null
+	. "$HOME/.cargo/env"
 }
 
 setup-terminal()
 {
+	dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
 	type -p starship &>/dev/null || {
 		echo "INSTALLING: Starship cross-shell prompt"
 		curl -sS https://starship.rs/install.sh | sh
 	}
+	gh release download --clobber --repo ryanoasis/nerd-fonts --pattern UbuntuMono.tar.xz --dir ~/.local/share/fonts
+	tar -xf ~/.local/share/fonts/UbuntuMono.tar.xz -C ~/.local/share/fonts
+	fc-cache
 }
 
 
@@ -86,7 +83,6 @@ echo 'INSTALLING: Baseline Packages'
 install-common-packages
 echo 'INSTALLING: Extra Goodies'
 type -p gh >/dev/null || install-github-cli
-#type -p az >/dev/null || install-azure-cli
 [ -f ~/.nvm/nvm-exec ] || install-nvm
 type -p ykman >/dev/null || install-yubikey-manager
 setup-rust

@@ -7,7 +7,7 @@
 !.config/nvim/init.lua
 !.cvsignore
 !.gitconfig
-!.github/*
+!README.md
 !.gitignore
 !.local/bin/bootstrap-dotfiles
 !.local/etc/settings.json
