@@ -5,7 +5,8 @@ set -e
 install-common-packages()
 {
 	echo 'INSTALLING: common-packages'
-	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper xdg-utils software-properties-common tmuxp fuse 
+	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common libfuse2
+	sudo apt remove nano
 	git lfs install 
 }
 
@@ -24,7 +25,7 @@ install-nvm()
 {
 	echo 'INSTALLING: Node Version Manager'
 	type -p curl || install-common-packages
-	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh | bash 
+	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 
 	export NVM_DIR="$HOME/.nvm"
 	[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" 
 	nvm install --lts 
@@ -38,7 +39,7 @@ setup-editor()
 	gh release download --repo neovim/neovim --pattern *appimage
 	mv nvim.appimage .local/bin
 	chmod +x .local/bin/nvim.appimage
-	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 60
+	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 100
 	sudo update-alternatives --auto editor
 }
 
