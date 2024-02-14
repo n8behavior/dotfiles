@@ -137,27 +137,6 @@ export NVM_DIR="$HOME/.nvm"
 # GitHub CLI stuff
 type gh && eval "$(gh completion -s bash)"
 
-# dotgit uses git's completion so `__git_completion` must exist
-if ! declare -f __git_complete &>/dev/null; then
-  _bash_completion=$(pkg-config --variable=completionsdir bash-completion 2>/dev/null) ||
-    _bash_completion='/usr/share/bash-completion/completions/'
-  _locations=(
-    "$(dirname "${BASH_SOURCE[0]%:*}")"/git-completion.bash #in same dir as this
-    "$HOME/.local/share/bash-completion/completions/git"
-    "$_bash_completion/git"
-    '/etc/bash_completion.d/git' # old debian
-    )
-  for _e in "${_locations[@]}"; do
-    # shellcheck disable=1090
-    test -f "$_e" && . "$_e" && break
-  done
-  unset _bash_completion _locations _e
-  if ! declare -f __git_complete &>/dev/null; then
-    return #silently return without completions
-  fi
-fi
-__git_complete dotgit __git_main
-
 if [ -d .secrets ]; then
 	source .secrets/*
 fi
@@ -165,3 +144,11 @@ fi
 . "$HOME/.cargo/env"
 
 eval "$(starship init bash)"
+
+# Source bash completion scripts
+if [ -d ~/.bash_completions.d ]; then
+    for file in ~/.bash_completions.d/*; do
+        [ -f "$file" ] && source "$file"
+    done
+fi
+
