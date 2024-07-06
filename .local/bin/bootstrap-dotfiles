@@ -5,7 +5,7 @@ set -e
 install-common-packages()
 {
 	echo 'INSTALLING: common-packages'
-	sudo apt install -y  gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common
+	sudo apt install -y gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
 	sudo apt remove nano
 	git lfs install 
 }
@@ -84,12 +84,7 @@ echo 'INSTALLING: Baseline Packages'
 install-common-packages
 echo 'INSTALLING: Extra Goodies'
 install-github-cli
-#Do we really need node any more? Rust FTW!
-#[ -f ~/.nvm/nvm-exec ] || install-nvm
 install-yubikey-manager
 setup-rust
 setup-editor
 setup-terminal
-
-#switch to starship
-#echo -e "\n\nYou'll wants these fonts\n\thttps://github.com/powerline/fonts"
