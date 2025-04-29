@@ -5,7 +5,7 @@ set -e
 install-common-packages()
 {
 	echo 'INSTALLING: common-packages'
-	sudo apt install -y gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
+	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
 	sudo apt remove nano
 	git lfs install 
 }
@@ -36,11 +36,17 @@ setup-editor()
 {
 	echo 'INSTALLING: Neovim'
 	type -p gh || install-github-cli
-	gh release download --repo neovim/neovim --pattern *appimage
-	mv nvim.appimage ~/.local/bin
+	gh release download --clobber --repo neovim/neovim --pattern nvim-linux-x86_64.appimage
+	mv nvim-linux-x86_64.appimage ~/.local/bin/nvim.appimage
 	chmod +x ~/.local/bin/nvim.appimage
 	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 100
 	sudo update-alternatives --auto editor
+}
+
+install-lazyvim()
+{
+	git clone https://github.com/LazyVim/starter ~/.config/nvim
+	rm -rf ~/.config/nvim/.git
 }
 
 install-yubikey-manager()
@@ -87,4 +93,5 @@ install-github-cli
 install-yubikey-manager
 setup-rust
 setup-editor
+install-lazyvim
 setup-terminal
