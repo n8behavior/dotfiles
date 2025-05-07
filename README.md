@@ -2,6 +2,7 @@
 
 ```
 cd ~
+tar -xf /media/sandman/Backup/secrets.tar
 git clone https://github.com/n8behavior/dotfiles /tmp/dotfiles
 mv /tmp/dotfiles/.git .
 git restore .

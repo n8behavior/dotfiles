@@ -2,90 +2,82 @@
 
 set -e
 
-install-common-packages()
-{
-	echo 'INSTALLING: common-packages'
-	sudo apt install -y build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
-	sudo apt remove nano
-	git lfs install 
+install-common-packages() {
+  echo 'INSTALLING: common-packages'
+  sudo apt install -y xclip build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
+  sudo apt remove -y nano
+  git lfs install
 }
 
-install-github-cli()
-{
-	echo 'INSTALLING: GitHub CLI'
-	type -p curl || install-common-packages
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 
-	sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list 
-	sudo apt install gh -y 
-	gh auth login
+install-github-cli() {
+  echo 'INSTALLING: GitHub CLI'
+  type -p curl || install-common-packages
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+  sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list
+  sudo apt install gh -y
 }
 
-install-nvm()
-{
-	echo 'INSTALLING: Node Version Manager'
-	type -p curl || install-common-packages
-	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 
-	export NVM_DIR="$HOME/.nvm"
-	[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" 
-	nvm install --lts 
-	nvm install-latest-npm 
+install-nvm() {
+  echo 'INSTALLING: Node Version Manager'
+  type -p curl || install-common-packages
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  nvm install --lts
+  nvm install-latest-npm
 }
 
-setup-editor()
-{
-	echo 'INSTALLING: Neovim'
-	type -p gh || install-github-cli
-	gh release download --clobber --repo neovim/neovim --pattern nvim-linux-x86_64.appimage
-	mv nvim-linux-x86_64.appimage ~/.local/bin/nvim.appimage
-	chmod +x ~/.local/bin/nvim.appimage
-	sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 100
-	sudo update-alternatives --auto editor
+setup-editor() {
+  echo 'INSTALLING: Neovim'
+  type -p gh || install-github-cli
+  gh release download --clobber --repo neovim/neovim --pattern nvim-linux-x86_64.appimage
+  mv nvim-linux-x86_64.appimage ~/.local/bin/nvim.appimage
+  chmod +x ~/.local/bin/nvim.appimage
+  sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 100
+  sudo update-alternatives --auto editor
 }
 
-install-lazyvim()
-{
-	git clone https://github.com/LazyVim/starter ~/.config/nvim
-	rm -rf ~/.config/nvim/.git
+install-lazyvim() {
+  local nvim_config=$HOME/.config/nvim
+  rm -rf $nvim_config
+  gh repo clone LazyVim/starter $nvim_config
+  rm -rf $nvim_config/.git
 }
 
-install-yubikey-manager()
-{ 
-	echo 'INSTALLING: Yubikey Mangager'
-	type -p add-apt-repository || install-common-packages
-	sudo add-apt-repository --yes ppa:yubico/stable 
-	sudo apt install -y yubikey-manager 
+install-yubikey-manager() {
+  echo 'INSTALLING: Yubikey Mangager'
+  type -p add-apt-repository || install-common-packages
+  sudo add-apt-repository --yes ppa:yubico/stable
+  sudo apt install -y yubikey-manager
 }
 
-setup-rust()
-{
-	type -p rustup || {
-		echo "INSTALLING: Rust dev environment"
-		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-	}
-	echo "UPDATING: Rust tooling"
-	. "$HOME/.cargo/env"
-	rustup update
-	rustup component add rust-analyzer
+setup-rust() {
+  type -p rustup || {
+    echo "INSTALLING: Rust dev environment"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  }
+  echo "UPDATING: Rust tooling"
+  . "$HOME/.cargo/env"
+  rustup update
+  rustup component add rust-analyzer
 }
 
-setup-terminal()
-{
-	dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
-	type -p starship  || {
-		echo "INSTALLING: Starship cross-shell prompt"
-		curl -sS https://starship.rs/install.sh | sh
-	}
-	gh release download --clobber --repo ryanoasis/nerd-fonts --pattern UbuntuMono.tar.xz --dir ~/.local/share/fonts
-	tar -xf ~/.local/share/fonts/UbuntuMono.tar.xz -C ~/.local/share/fonts
-	fc-cache
+setup-terminal() {
+  dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
+  type -p starship || {
+    echo "INSTALLING: Starship cross-shell prompt"
+    curl -sS https://starship.rs/install.sh | sh -s -- -y
+  }
+  gh release download --clobber --repo ryanoasis/nerd-fonts --pattern UbuntuMono.tar.xz --dir ~/.local/share/fonts
+  tar -xf ~/.local/share/fonts/UbuntuMono.tar.xz -C ~/.local/share/fonts
+  fc-cache
 }
-
 
 echo 'UPDATING: APT Repository Lists'
-sudo apt update 
+sudo apt update
 echo 'UPDATING: All Installed Packages'
-sudo apt dist-upgrade -y 
+sudo apt dist-upgrade -y
 echo 'INSTALLING: Baseline Packages'
 install-common-packages
 echo 'INSTALLING: Extra Goodies'
