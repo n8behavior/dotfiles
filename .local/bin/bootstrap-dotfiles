@@ -87,3 +87,4 @@ setup-rust
 setup-editor
 install-lazyvim
 setup-terminal
+sudo snap install freecad
