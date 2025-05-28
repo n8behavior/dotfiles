@@ -87,5 +87,5 @@ setup-rust
 setup-editor
 install-lazyvim
 setup-terminal
-sudo snap install freecad
+#sudo snap install freecad
 cargo install aichat
