@@ -12,8 +12,10 @@
 !.gitconfig
 !README.md
 !.gitignore
+!.local/
 !.local/bin/
 !.local/bin/bootstrap-dotfiles
+!.local/bin/markdownlint-cli2
 !.local/etc/
 !.local/etc/settings.json
 !.profile

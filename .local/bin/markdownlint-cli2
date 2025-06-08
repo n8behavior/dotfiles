@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE="docker.io/davidanson/markdownlint-cli2:latest"
+
+# 1) Ensure Podman is installed
+if ! command -v podman >/dev/null 2>&1; then
+  echo "🔧 Podman not found, installing via apt…"
+  sudo apt update
+  sudo apt install -y podman
+fi
+
+# 2) Ensure the markdownlint-cli2 image is present
+if ! podman image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "⬇️  Pulling $IMAGE…"
+  podman pull "$IMAGE"
+fi
+
+# 3) Run markdownlint-cli2 inside the container
+exec podman run --rm \
+  -u "$(id -u):$(id -g)" \
+  -v "$PWD":"$PWD" -w "$PWD" \
+  "$IMAGE" \
+  "$@"
