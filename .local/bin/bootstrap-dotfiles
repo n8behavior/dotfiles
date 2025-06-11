@@ -19,13 +19,20 @@ install-github-cli() {
 }
 
 install-nvm() {
-  echo 'INSTALLING: Node Version Manager'
+  local version=$(gh release --repo nvm-sh/nvm view | head -n1 | awk '{print $2}')
+  echo "INSTALLING: Node Version Manager (${version}"
   type -p curl || install-common-packages
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${version}/install.sh | bash
   export NVM_DIR="$HOME/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
   nvm install --lts
   nvm install-latest-npm
+  # Append the NVM initialization snippet
+  cat <<'END' >>"$HOME/.bashrc"
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+END
 }
 
 setup-editor() {
@@ -39,10 +46,14 @@ setup-editor() {
 }
 
 install-lazyvim() {
+  echo 'INSTALLING: LazyVim'
+  type -p nvm || install-nvm
+  type -p gh || install-github-cli
   local nvim_config=$HOME/.config/nvim
   rm -rf $nvim_config
   gh repo clone LazyVim/starter $nvim_config
   rm -rf $nvim_config/.git
+  npm i -g markdownlint-cli2 markdown-toc prettier
 }
 
 install-yubikey-manager() {
@@ -84,6 +95,7 @@ echo 'INSTALLING: Extra Goodies'
 install-github-cli
 install-yubikey-manager
 setup-rust
+install-nvm
 setup-editor
 install-lazyvim
 setup-terminal
