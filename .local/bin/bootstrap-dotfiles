@@ -38,7 +38,7 @@ END
 setup-editor() {
   echo 'INSTALLING: Neovim'
   type -p gh || install-github-cli
-  gh release download --clobber --repo neovim/neovim --pattern nvim-linux-x86_64.appimage
+  gh release download --repo neovim/neovim --pattern nvim-linux-x86_64.appimage
   mv nvim-linux-x86_64.appimage ~/.local/bin/nvim.appimage
   chmod +x ~/.local/bin/nvim.appimage
   sudo update-alternatives --install /usr/bin/editor editor ~/.local/bin/nvim.appimage 100

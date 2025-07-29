@@ -1,6 +1,8 @@
 *
 !.bash_aliases
 !.bash_functions
+!.bash_completions.d/
+!.bash_completions.d/**
 !.bash_logout
 !.bashrc
 !.config/
