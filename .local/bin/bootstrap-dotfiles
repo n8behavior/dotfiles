@@ -74,6 +74,22 @@ setup-rust() {
   rustup component add rust-analyzer
 }
 
+install-claude-code() {
+  echo 'INSTALLING: Claude Code CLI'
+  type -p claude && {
+    echo "Claude Code is already installed at $(which claude)"
+    return 0
+  }
+  type -p curl || install-common-packages
+  curl -fsSL claude.ai/install.sh | bash
+  # Verify installation
+  if type -p claude > /dev/null; then
+    echo "Claude Code $(claude --version) installed successfully"
+  else
+    echo "Warning: Claude Code installation may have failed"
+  fi
+}
+
 setup-terminal() {
   dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
   type -p starship || {
@@ -99,5 +115,6 @@ install-nvm
 setup-editor
 install-lazyvim
 setup-terminal
+install-claude-code
 #sudo snap install freecad
 cargo install aichat
