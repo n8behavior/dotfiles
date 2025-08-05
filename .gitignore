@@ -11,6 +11,7 @@
 !.config/nvim/
 !.config/nvim/**
 !.cvsignore
+!.dircolors
 !.gitconfig
 !README.md
 !.gitignore
