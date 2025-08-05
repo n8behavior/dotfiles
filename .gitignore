@@ -10,6 +10,8 @@
 !.config/gh/config.yml
 !.config/nvim/
 !.config/nvim/**
+!.claude/
+!.claude/settings.json
 !.cvsignore
 !.dircolors
 !.gitconfig
