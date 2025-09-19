@@ -50,9 +50,13 @@ install-lazyvim() {
   type -p nvm || install-nvm
   type -p gh || install-github-cli
   local nvim_config=$HOME/.config/nvim
-  rm -rf $nvim_config
-  gh repo clone LazyVim/starter $nvim_config
-  rm -rf $nvim_config/.git
+  if [ ! -d "$nvim_config" ]; then
+    echo "Setting up LazyVim starter config"
+    gh repo clone LazyVim/starter $nvim_config
+    rm -rf $nvim_config/.git
+  else
+    echo "Neovim config already exists at $nvim_config, skipping LazyVim setup"
+  fi
   npm i -g markdownlint-cli2 markdown-toc prettier
 }
 
@@ -99,6 +103,16 @@ setup-terminal() {
   gh release download --clobber --repo ryanoasis/nerd-fonts --pattern UbuntuMono.tar.xz --dir ~/.local/share/fonts
   tar -xf ~/.local/share/fonts/UbuntuMono.tar.xz -C ~/.local/share/fonts
   fc-cache
+
+  # Install Tmux Plugin Manager
+  if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
+    echo "INSTALLING: Tmux Plugin Manager"
+    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+    # Auto-install plugins if tmux config exists
+    if [ -f "$HOME/.tmux.conf" ]; then
+      ~/.tmux/plugins/tpm/bin/install_plugins
+    fi
+  fi
 }
 
 echo 'UPDATING: APT Repository Lists'
