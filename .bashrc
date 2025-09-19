@@ -137,6 +137,9 @@ export NVM_DIR="$HOME/.nvm"
 # GitHub CLI stuff
 type gh && eval "$(gh completion -s bash)"
 
+# Export GitHub token dynamically for MCP server
+export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
+
 if [ -d .secrets ]; then
 	source .secrets/*
 fi
@@ -162,3 +165,9 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 alias claude="/home/sandman/.claude/local/claude"
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/home/sandman/google-cloud-sdk/path.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/path.bash.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/home/sandman/google-cloud-sdk/completion.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/completion.bash.inc'; fi
