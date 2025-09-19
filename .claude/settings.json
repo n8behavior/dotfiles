@@ -1,3 +1,14 @@
 {
-  "includeCoAuthoredBy": false
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": []
+      }
+    ]
+  },
+  "includeCoAuthoredBy": false,
+  "env": {
+    "DISABLE_TELEMETRY": "1"
+  }
 }

@@ -5,6 +5,8 @@
 !.bash_completions.d/**
 !.bash_logout
 !.bashrc
+!.claude/
+!.claude/settings.json
 !.config/
 !.config/gh/
 !.config/gh/config.yml
