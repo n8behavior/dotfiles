@@ -27,12 +27,17 @@ install-nvm() {
   [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
   nvm install --lts
   nvm install-latest-npm
-  # Append the NVM initialization snippet
-  cat <<'END' >>"$HOME/.bashrc"
+  # Only append NVM config if it doesn't already exist in .bashrc
+  if ! grep -q 'NVM_DIR="$HOME/.nvm"' "$HOME/.bashrc"; then
+    echo "Adding NVM configuration to .bashrc"
+    cat <<'END' >>"$HOME/.bashrc"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 END
+  else
+    echo "NVM configuration already exists in .bashrc"
+  fi
 }
 
 setup-editor() {
@@ -56,6 +61,11 @@ install-lazyvim() {
     rm -rf $nvim_config/.git
   else
     echo "Neovim config already exists at $nvim_config, skipping LazyVim setup"
+    # Clean up lock file if it exists (for machine-specific regeneration)
+    if [ -f "$nvim_config/lazy-lock.json" ]; then
+      echo "Removing lazy-lock.json for local regeneration"
+      rm -f "$nvim_config/lazy-lock.json"
+    fi
   fi
   npm i -g markdownlint-cli2 markdown-toc prettier
 }
