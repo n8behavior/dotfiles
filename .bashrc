@@ -136,9 +136,6 @@ export NVM_DIR="$HOME/.nvm"
 # GitHub CLI stuff
 type gh && eval "$(gh completion -s bash)"
 
-# Export GitHub token dynamically for MCP server
-export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
-
 if [ -d .secrets ]; then
   source .secrets/*
 fi
