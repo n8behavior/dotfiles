@@ -161,3 +161,8 @@ if [ -f '/home/sandman/google-cloud-sdk/path.bash.inc' ]; then . '/home/sandman/
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/home/sandman/google-cloud-sdk/completion.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/completion.bash.inc'; fi
+
+. "$HOME/.atuin/bin/env"
+
+[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
+eval "$(atuin init bash)"

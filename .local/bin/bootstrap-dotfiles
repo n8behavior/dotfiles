@@ -2,11 +2,89 @@
 
 set -e
 
+# Recovery drive path for secrets
+RECOVERY_PATH="/media/sandman/Recovery/secrets"
+
 install-common-packages() {
   echo 'INSTALLING: common-packages'
-  sudo apt install -y xclip build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs
+  sudo apt install -y xclip build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf
   sudo apt remove -y nano
   git lfs install
+}
+
+install-passage() {
+  echo 'INSTALLING: passage + age tools'
+  type -p rustup || setup-rust
+  . "$HOME/.cargo/env"
+
+  # Install rage (Rust age implementation) and YubiKey plugin
+  cargo install rage age-plugin-yubikey
+
+  # Create symlinks for age compatibility
+  sudo ln -sf "$HOME/.cargo/bin/rage" /usr/local/bin/age
+  sudo ln -sf "$HOME/.cargo/bin/rage-keygen" /usr/local/bin/age-keygen
+
+  # Install passage
+  if [[ ! -f /usr/local/bin/passage ]]; then
+    git clone https://github.com/FiloSottile/passage.git /tmp/passage
+    sudo cp /tmp/passage/src/password-store.sh /usr/local/bin/passage
+    sudo chmod +x /usr/local/bin/passage
+    rm -rf /tmp/passage
+  fi
+}
+
+restore-secrets() {
+  echo 'RESTORING: secrets from Recovery drive'
+
+  if [[ ! -d "$RECOVERY_PATH/passage-store" ]]; then
+    echo "ERROR: Recovery drive not found at $RECOVERY_PATH"
+    echo "Please mount the Recovery drive and try again."
+    exit 1
+  fi
+
+  # Restore passage store
+  mkdir -p ~/.passage
+  cp -r "$RECOVERY_PATH/passage-store" ~/.passage/store
+  chmod 700 ~/.passage/store
+
+  # Setup YubiKey identity for passage
+  echo "Please insert your YubiKey..."
+  age-plugin-yubikey --identity > ~/.passage/identities
+
+  # Restore SSH keys
+  echo "Restoring SSH keys (touch YubiKey when prompted)..."
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  passage show ssh/id_ed25519 > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+  passage show ssh/id_ed25519.pub > ~/.ssh/id_ed25519.pub && chmod 644 ~/.ssh/id_ed25519.pub
+  passage show ssh/id_rsa > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+  passage show ssh/id_rsa.pub > ~/.ssh/id_rsa.pub && chmod 644 ~/.ssh/id_rsa.pub
+  passage show ssh/known_hosts > ~/.ssh/known_hosts
+
+  # Restore GPG keys
+  echo "Restoring GPG keys..."
+  passage show gpg/secret-keys | gpg --import
+  passage show gpg/public-keys | gpg --import
+  passage show gpg/ownertrust | gpg --import-ownertrust
+
+  # Restore SOPS key
+  echo "Restoring SOPS key..."
+  mkdir -p ~/.config/sops/age
+  passage show sops/age-key > ~/.config/sops/age/keys.txt
+  chmod 600 ~/.config/sops/age/keys.txt
+
+  # Restore keyrings
+  echo "Restoring keyrings..."
+  mkdir -p ~/.local/share/keyrings
+  passage show keyrings/login.keyring > ~/.local/share/keyrings/login.keyring
+  passage show keyrings/user.keystore > ~/.local/share/keyrings/user.keystore
+
+  # Restore atuin key
+  echo "Restoring atuin key..."
+  mkdir -p ~/.local/share/atuin
+  passage show atuin/key > ~/.local/share/atuin/key
+  chmod 600 ~/.local/share/atuin/key
+
+  echo "Secrets restored successfully!"
 }
 
 install-github-cli() {
@@ -131,14 +209,22 @@ echo 'UPDATING: All Installed Packages'
 sudo apt dist-upgrade -y
 echo 'INSTALLING: Baseline Packages'
 install-common-packages
-echo 'INSTALLING: Extra Goodies'
-install-github-cli
 install-yubikey-manager
 setup-rust
+install-passage
+
+# Restore secrets if Recovery drive is mounted
+if [[ -d "$RECOVERY_PATH/passage-store" ]]; then
+  restore-secrets
+else
+  echo "SKIPPING: secrets restoration (Recovery drive not mounted)"
+fi
+
+echo 'INSTALLING: Extra Goodies'
+install-github-cli
 install-nvm
 setup-editor
 install-lazyvim
 setup-terminal
 install-claude-code
-#sudo snap install freecad
 cargo install aichat
