@@ -43,8 +43,8 @@ restore-secrets() {
   fi
 
   # Restore passage store
-  mkdir -p ~/.passage
-  cp -r "$RECOVERY_PATH/passage-store" ~/.passage/store
+  mkdir -p ~/.passage/store
+  cp -r "$RECOVERY_PATH/passage-store/." ~/.passage/store/
   chmod 700 ~/.passage/store
 
   # Setup YubiKey identity for passage
