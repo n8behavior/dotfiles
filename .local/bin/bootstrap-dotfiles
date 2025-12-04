@@ -241,8 +241,18 @@ setup-dotfiles() {
 
 setup-dotfiles
 
+install-atuin() {
+  echo 'INSTALLING: Atuin shell history'
+  if [[ -d ~/.atuin ]]; then
+    echo "Atuin already installed"
+    return 0
+  fi
+  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+}
+
 echo 'INSTALLING: Extra Goodies'
 install-github-cli
+install-atuin
 install-nvm
 setup-editor
 install-lazyvim
