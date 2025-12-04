@@ -226,6 +226,21 @@ else
   echo "SKIPPING: secrets restoration (Recovery drive not mounted)"
 fi
 
+setup-dotfiles() {
+  echo 'SETTING UP: dotfiles'
+  if [[ -d ~/.git ]]; then
+    echo "Dotfiles already set up, pulling latest..."
+    git -C ~ pull
+    return 0
+  fi
+  git clone https://github.com/n8behavior/dotfiles /tmp/dotfiles
+  mv /tmp/dotfiles/.git ~
+  git -C ~ restore .
+  rm -rf /tmp/dotfiles
+}
+
+setup-dotfiles
+
 echo 'INSTALLING: Extra Goodies'
 install-github-cli
 install-nvm
