@@ -241,6 +241,9 @@ setup-dotfiles() {
 
 setup-dotfiles
 
+# Ensure paths are available for rest of script (dotfiles may have updated .bashrc)
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin:$PATH"
+
 install-atuin() {
   echo 'INSTALLING: Atuin shell history'
   if [[ -d ~/.atuin ]]; then
