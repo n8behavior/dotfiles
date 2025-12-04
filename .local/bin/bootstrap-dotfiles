@@ -193,9 +193,10 @@ setup-terminal() {
     echo "INSTALLING: Starship cross-shell prompt"
     curl -sS https://starship.rs/install.sh | sh -s -- -y
   }
+  mkdir -p ~/.local/share/fonts
   gh release download --clobber --repo ryanoasis/nerd-fonts --pattern UbuntuMono.tar.xz --dir ~/.local/share/fonts
   tar -xf ~/.local/share/fonts/UbuntuMono.tar.xz -C ~/.local/share/fonts
-  fc-cache
+  type -p fc-cache && fc-cache
 
   # Install Tmux Plugin Manager
   if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
