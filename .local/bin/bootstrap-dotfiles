@@ -84,6 +84,10 @@ restore-secrets() {
   passage show atuin/key > ~/.local/share/atuin/key
   chmod 600 ~/.local/share/atuin/key
 
+  # Restore gh token (for headless environments without keyring)
+  echo "Restoring GitHub CLI token..."
+  passage show gh/token | gh auth login --with-token
+
   echo "Secrets restored successfully!"
 }
 
