@@ -187,7 +187,8 @@ install-claude-code() {
 }
 
 setup-terminal() {
-  dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
+  # Set caps lock as ctrl (desktop only)
+  type -p dconf && dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
   type -p starship || {
     echo "INSTALLING: Starship cross-shell prompt"
     curl -sS https://starship.rs/install.sh | sh -s -- -y
