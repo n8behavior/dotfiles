@@ -12,6 +12,7 @@
       }
     ]
   },
+  "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754015932533
   },
@@ -24,5 +25,7 @@
       ]
     }
   },
-  "alwaysThinkingEnabled": true
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
+  }
 }
