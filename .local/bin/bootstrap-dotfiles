@@ -88,6 +88,12 @@ restore-secrets() {
   echo "Restoring GitHub CLI token..."
   passage show gh/token | gh auth login --with-token
 
+  # Restore Claude Code credentials
+  echo "Restoring Claude Code credentials..."
+  mkdir -p ~/.claude
+  passage show claude/credentials > ~/.claude/.credentials.json
+  chmod 600 ~/.claude/.credentials.json
+
   echo "Secrets restored successfully!"
 }
 
