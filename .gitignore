@@ -13,6 +13,7 @@
 !.config/nvim/
 !.config/nvim/**
 .config/nvim/lazy-lock.json
+!.config/starship.toml
 !.claude/
 !.claude/settings.json
 !.cvsignore
