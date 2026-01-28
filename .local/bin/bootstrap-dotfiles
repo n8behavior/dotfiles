@@ -7,7 +7,7 @@ RECOVERY_PATH="/media/sandman/Recovery/secrets"
 
 install-common-packages() {
   echo 'INSTALLING: common-packages'
-  sudo apt install -y xclip build-essential gnupg curl tmux git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf
+  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf
   sudo apt remove -y nano
   git lfs install
 }
@@ -218,6 +218,7 @@ install-common-packages
 install-yubikey-manager
 setup-rust
 install-passage
+install-github-cli
 
 # Restore secrets if Recovery drive is mounted
 if [[ -d "$RECOVERY_PATH/passage-store" ]]; then
@@ -254,7 +255,6 @@ install-atuin() {
 }
 
 echo 'INSTALLING: Extra Goodies'
-install-github-cli
 install-atuin
 install-nvm
 setup-editor

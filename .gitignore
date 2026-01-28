@@ -10,7 +10,6 @@
 !.config/
 !.config/gh/
 !.config/gh/config.yml
-!.config/gh/hosts.yml
 !.config/nvim/
 !.config/nvim/**
 .config/nvim/lazy-lock.json
@@ -19,7 +18,8 @@
 !.cvsignore
 !.dircolors
 !.gitconfig
-!README.md
+!.github/
+!.github/README.md
 !.gitignore
 !.local/
 !.local/bin/
