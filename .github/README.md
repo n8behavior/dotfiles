@@ -14,7 +14,6 @@
 ```
 sudo apt update && sudo apt install -y git
 cd ~
-#tar -xf /media/sandman/Recovery/secrets/secrets.tar
 git clone https://github.com/n8behavior/dotfiles /tmp/dotfiles
 mv /tmp/dotfiles/.git .
 git restore .
