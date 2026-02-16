@@ -14,6 +14,9 @@
 !.config/nvim/**
 .config/nvim/lazy-lock.json
 !.config/starship.toml
+!.config/wireplumber/
+!.config/wireplumber/bluetooth.lua.d/
+!.config/wireplumber/bluetooth.lua.d/**
 !.claude/
 !.claude/settings.json
 !.cvsignore
