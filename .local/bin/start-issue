@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: start-issue <issue-number>"
+  echo "  Launches a Claude Code session in a named tmux window + worktree for the given GitHub issue."
+  exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+ISSUE_NUM="$1"
+
+# Fetch issue metadata
+ISSUE_JSON=$(gh issue view "$ISSUE_NUM" --json title,body)
+TITLE=$(echo "$ISSUE_JSON" | jq -r .title)
+BODY=$(echo "$ISSUE_JSON" | jq -r .body)
+
+# Slugify: lowercase, replace non-alnum with hyphens, collapse, trim, truncate
+SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+
+WORKTREE_NAME="${ISSUE_NUM}-${SLUG}"
+SESSION_NAME="issue-${ISSUE_NUM}"
+
+# Write prompt to temp file to avoid shell escaping issues with tmux
+PROMPT_FILE=$(mktemp /tmp/start-issue-XXXXXX.md)
+cat > "$PROMPT_FILE" <<EOF
+Implement GitHub issue #${ISSUE_NUM}: ${TITLE}
+
+${BODY}
+EOF
+
+# Launcher script reads prompt from file, cleans up temp files, then execs claude
+LAUNCHER=$(mktemp /tmp/start-issue-XXXXXX.sh)
+cat > "$LAUNCHER" <<HEREDOC
+#!/usr/bin/env bash
+PROMPT=\$(cat '${PROMPT_FILE}')
+rm -f '${PROMPT_FILE}' '${LAUNCHER}'
+exec claude -w '${WORKTREE_NAME}' -n '${SESSION_NAME}' --permission-mode plan "\$PROMPT"
+HEREDOC
+chmod +x "$LAUNCHER"
+
+if [[ -n "${TMUX:-}" ]]; then
+  # Already in tmux — create a new named window
+  tmux new-window -n "$WORKTREE_NAME" "$LAUNCHER"
+else
+  # Not in tmux — create a new session and attach
+  tmux new-session -d -s "issues" -n "$WORKTREE_NAME" "$LAUNCHER"
+  tmux attach -t "issues"
+fi
