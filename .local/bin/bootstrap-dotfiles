@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+cd "$HOME"
 
 # Recovery drive path for secrets
 RECOVERY_PATH="/media/sandman/Recovery/secrets"
@@ -143,18 +144,32 @@ install-lazyvim() {
   type -p nvm || install-nvm
   type -p gh || install-github-cli
   local nvim_config=$HOME/.config/nvim
-  if [ ! -d "$nvim_config" ]; then
-    echo "Setting up LazyVim starter config"
-    gh repo clone LazyVim/starter $nvim_config
-    rm -rf $nvim_config/.git
-  else
-    echo "Neovim config already exists at $nvim_config, skipping LazyVim setup"
-    # Clean up lock file if it exists (for machine-specific regeneration)
-    if [ -f "$nvim_config/lazy-lock.json" ]; then
-      echo "Removing lazy-lock.json for local regeneration"
-      rm -f "$nvim_config/lazy-lock.json"
-    fi
-  fi
+
+  # Wipe config, plugins, state, and cache for a clean slate
+  rm -rf "$nvim_config" ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
+  git clone https://github.com/LazyVim/starter.git "$nvim_config"
+  rm -rf "$nvim_config/.git"
+
+  # Restore personal customizations from dotfiles repo
+  git -C ~ restore --source=HEAD -- \
+    .config/nvim/lua/plugins/colorscheme.lua \
+    .config/nvim/spell/en.utf-8.add \
+    .config/nvim/spell/en.utf-8.add.spl
+
+  # Seed lazyvim.json with extras (version must match LazyVim to skip migrations)
+  cat > "$nvim_config/lazyvim.json" << 'LAZYVIM_JSON'
+{
+  "extras": [
+    "lazyvim.plugins.extras.ai.claudecode",
+    "lazyvim.plugins.extras.lang.json",
+    "lazyvim.plugins.extras.lang.markdown",
+    "lazyvim.plugins.extras.lang.rust",
+    "lazyvim.plugins.extras.lang.toml"
+  ],
+  "version": 8
+}
+LAZYVIM_JSON
+
   npm i -g markdownlint-cli2 markdown-toc prettier
 }
 
@@ -285,9 +300,21 @@ install-atuin() {
   curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
 }
 
+install-fzf() {
+  echo 'INSTALLING: fzf (latest from GitHub)'
+  type -p gh || install-github-cli
+  local tmp=$(mktemp -d)
+  gh release download --repo junegunn/fzf --pattern "fzf-*-linux_amd64.tar.gz" --dir "$tmp"
+  tar -xzf "$tmp"/fzf-*-linux_amd64.tar.gz -C "$tmp"
+  install -m 755 "$tmp/fzf" ~/.local/bin/fzf
+  rm -rf "$tmp"
+  echo "fzf $(~/.local/bin/fzf --version) installed"
+}
+
 echo 'INSTALLING: Extra Goodies'
 install-atuin
 install-nvm
+install-fzf
 setup-editor
 install-lazyvim
 setup-terminal

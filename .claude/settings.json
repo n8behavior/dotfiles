@@ -13,9 +13,12 @@
     ]
   },
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "github@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
   "feedbackSurveyState": {
     "lastShownTime": 1754015932533
   },
@@ -27,5 +30,6 @@
         "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
       ]
     }
-  }
+  },
+  "voiceEnabled": true
 }

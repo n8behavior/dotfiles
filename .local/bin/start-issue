@@ -20,7 +20,14 @@ BODY=$(echo "$ISSUE_JSON" | jq -r .body)
 SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
 
 WORKTREE_NAME="${ISSUE_NUM}-${SLUG}"
+BRANCH_NAME="worktree-${WORKTREE_NAME}"
 SESSION_NAME="issue-${ISSUE_NUM}"
+WORKTREE_DIR=".claude/worktrees/${WORKTREE_NAME}"
+
+# Create worktree + branch if they don't already exist.
+if [[ ! -d "$WORKTREE_DIR" ]]; then
+  git worktree add "$WORKTREE_DIR" -b "$BRANCH_NAME"
+fi
 
 # Write prompt to temp file to avoid shell escaping issues with tmux
 PROMPT_FILE=$(mktemp /tmp/start-issue-XXXXXX.md)
@@ -32,11 +39,13 @@ EOF
 
 # Launcher script reads prompt from file, cleans up temp files, then execs claude
 LAUNCHER=$(mktemp /tmp/start-issue-XXXXXX.sh)
+WORKTREE_ABS=$(cd "$WORKTREE_DIR" && pwd)
 cat > "$LAUNCHER" <<HEREDOC
 #!/usr/bin/env bash
+cd '${WORKTREE_ABS}'
 PROMPT=\$(cat '${PROMPT_FILE}')
 rm -f '${PROMPT_FILE}' '${LAUNCHER}'
-exec claude -w '${WORKTREE_NAME}' -n '${SESSION_NAME}' --permission-mode plan "\$PROMPT"
+exec claude -n '${SESSION_NAME}' --permission-mode plan "\$PROMPT"
 HEREDOC
 chmod +x "$LAUNCHER"
 
