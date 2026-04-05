@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: close-issue <issue-number>"
+  echo "  Merges the worktree branch into main, pushes, closes the GitHub issue, and cleans up."
+  exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+ISSUE_NUM="$1"
+
+# Find the main repo root (the non-worktree checkout).
+REPO_ROOT=$(git worktree list --porcelain | awk '/^worktree / && !/\.claude\/worktrees/ {print $2; exit}')
+if [[ -z "$REPO_ROOT" ]]; then
+  echo "Error: could not find the main repo root via 'git worktree list'." >&2
+  exit 1
+fi
+
+cd "$REPO_ROOT"
+
+# Find the branch matching this issue number (may not exist if already cleaned up).
+BRANCH=$(git branch --list "worktree-${ISSUE_NUM}-*" | tr -d ' *+' | head -1)
+
+if [[ -n "$BRANCH" ]]; then
+  WORKTREE_NAME="${BRANCH#worktree-}"
+  WORKTREE_PATH="${REPO_ROOT}/.claude/worktrees/${WORKTREE_NAME}"
+
+  echo "=== close-issue ${ISSUE_NUM} ==="
+  echo "  Branch:   ${BRANCH}"
+  echo "  Worktree: ${WORKTREE_PATH}"
+  echo ""
+
+  # Merge if branch is not yet merged into main.
+  if ! git merge-base --is-ancestor "$BRANCH" main 2>/dev/null; then
+    # Ensure main is clean before merging.
+    if [[ -n "$(git status --porcelain)" ]]; then
+      echo "Error: main repo has uncommitted changes. Commit or stash them first." >&2
+      exit 1
+    fi
+
+    echo "Merging ${BRANCH} into main..."
+    if ! git merge "$BRANCH" --no-edit; then
+      echo "" >&2
+      echo "Error: merge conflict. Resolve manually in ${REPO_ROOT}, then re-run." >&2
+      git merge --abort
+      exit 1
+    fi
+  else
+    echo "Branch ${BRANCH} already merged into main, skipping merge."
+  fi
+
+  # Verify code quality before pushing.
+  echo "Running cargo fmt..."
+  if ! cargo fmt --all -- --check; then
+    echo ""
+    echo "Formatting issues detected. Running cargo fmt to fix..."
+    cargo fmt --all
+    git add -A
+    git commit -m "Run cargo fmt" --no-edit
+  fi
+
+  echo "Running cargo clippy..."
+  if ! cargo clippy 2>&1; then
+    echo "" >&2
+    echo "Error: clippy warnings found. Fix them before closing." >&2
+    exit 1
+  fi
+
+  # Push to remote.
+  echo "Pushing main to origin..."
+  git push origin main
+
+  # Build a commit summary for the issue comment.
+  COMMIT_LOG=$(git log main..."${BRANCH}" --oneline 2>/dev/null || true)
+  if [[ -z "$COMMIT_LOG" ]]; then
+    COMMIT_LOG=$(git log --oneline --first-parent -1 HEAD)
+  fi
+
+  COMMENT="Closed via merge of \`${BRANCH}\` into main."
+  if [[ -n "$COMMIT_LOG" ]]; then
+    COMMENT="${COMMENT}
+
+Commits:
+$(echo "$COMMIT_LOG" | sed 's/^/- /')"
+  fi
+
+  # Close the GitHub issue (gh is idempotent — closing an already-closed issue is a no-op).
+  echo "Closing issue #${ISSUE_NUM}..."
+  gh issue close "$ISSUE_NUM" --comment "$COMMENT" 2>/dev/null || true
+
+  # Remove worktree.
+  if [[ -d "$WORKTREE_PATH" ]]; then
+    WORKTREE_DIRTY=$(git -C "$WORKTREE_PATH" diff --name-only HEAD 2>/dev/null || true)
+    WORKTREE_STAGED=$(git -C "$WORKTREE_PATH" diff --cached --name-only 2>/dev/null || true)
+    if [[ -n "$WORKTREE_DIRTY" || -n "$WORKTREE_STAGED" ]]; then
+      echo "Error: worktree has uncommitted tracked changes. Not removing." >&2
+      echo "$WORKTREE_DIRTY" "$WORKTREE_STAGED" | sed 's/^/  /' >&2
+      exit 1
+    fi
+    echo "Removing worktree ${WORKTREE_NAME}..."
+    git worktree remove "$WORKTREE_PATH"
+  fi
+
+  # Delete the local branch.
+  echo "Deleting branch ${BRANCH}..."
+  git branch -d "$BRANCH" 2>/dev/null || true
+
+  # Kill the tmux window if it exists.
+  if [[ -n "${TMUX:-}" ]] || command -v tmux &>/dev/null; then
+    tmux kill-window -t ":${WORKTREE_NAME}" 2>/dev/null || true
+  fi
+else
+  echo "=== close-issue ${ISSUE_NUM} ==="
+  echo "  No branch found for issue ${ISSUE_NUM}."
+  echo ""
+
+  # Check if already closed.
+  ISSUE_STATE=$(gh issue view "$ISSUE_NUM" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+  if [[ "$ISSUE_STATE" == "CLOSED" ]]; then
+    echo "Issue #${ISSUE_NUM} is already closed. Nothing to do."
+    exit 0
+  fi
+
+  echo "Error: issue #${ISSUE_NUM} is ${ISSUE_STATE} but no worktree branch exists." >&2
+  exit 1
+fi
+
+echo ""
+echo "Done! Issue #${ISSUE_NUM} closed and cleaned up."

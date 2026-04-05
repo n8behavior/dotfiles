@@ -32,6 +32,7 @@
 !.local/bin/
 !.local/bin/bootstrap-dotfiles
 !.local/bin/start-issue
+!.local/bin/close-issue
 !.local/bin/markdownlint-cli2
 !.local/etc/
 !.local/etc/settings.json
