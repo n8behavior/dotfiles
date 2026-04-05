@@ -19,6 +19,7 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "voiceEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754015932533
   },
@@ -30,6 +31,5 @@
         "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
       ]
     }
-  },
-  "voiceEnabled": true
+  }
 }
