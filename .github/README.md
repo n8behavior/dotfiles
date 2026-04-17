@@ -25,6 +25,43 @@ git restore .
 All paths in the `worktree` are ignored by default and must be explicitly
 added in the `.gitigore`.
 
+## Gruvbox theme sync (dark / light)
+
+GNOME's `org.gnome.desktop.interface color-scheme` is the single source of
+truth. The system Quick Settings dark/light toggle — or the `theme-toggle`
+command — flips it, and a user-level systemd service fans out to everything
+else.
+
+```
+color-scheme ──► theme-sync.service ──► tmux, starship,
+                 (gsettings monitor)    gnome-terminal default profile, GTK
+
+                                     ┌► nvim (auto-dark-mode.nvim polls
+                                        gsettings directly)
+```
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `theme-toggle` | Flip `color-scheme` between `prefer-dark` and `default`. Bind to a keyboard shortcut if you want. |
+| `theme-sync` | Idempotent fanout: rewrites `~/.config/tmux/theme.conf`, sed-edits the starship palette line, dconf-writes the 16-color palette of the single `Gruvbox` gnome-terminal profile (VTE reacts instantly, so open terminals flip live), sets the GTK theme. Runs automatically via the systemd listener. |
+| `theme-sync-install` | One-time post-`git pull` setup — installs `Gruvbox-GTK-Theme` into `~/.themes` and enables the systemd service. `bootstrap-dotfiles` does the same work inline on fresh machines. |
+
+### Files
+
+- `.local/bin/theme-sync`, `theme-toggle`, `theme-sync-install`
+- `.config/systemd/user/theme-sync.service` — `gsettings monitor` loop; `ExecStartPre` applies current state at login
+- `.config/theme-sync.env` — gnome-terminal `Gruvbox` profile UUID (must match `setup-gnome-terminal-gruvbox` in `bootstrap-dotfiles`)
+- `.config/tmux/theme.conf` — sourced by `.tmux.conf`; rewritten by `theme-sync`
+- `.config/starship.toml` — defines `gruvbox_dark` and `gruvbox_light` palettes; `theme-sync` rewrites the `palette = …` line
+- `.config/nvim/lua/plugins/colorscheme.lua` — loads `f-person/auto-dark-mode.nvim`, which polls gsettings and flips `vim.o.background`
+
+### Requirements
+
+- `sassc` (apt) — needed to compile Gruvbox-GTK-Theme. Included in `install-common-packages`.
+- `f-person/auto-dark-mode.nvim` — pulled in by LazyVim; run `:Lazy sync` after first update.
+
 ## WSL2 Setup
 
 ### Mounting ext4 USB Drives and YubiKey Access

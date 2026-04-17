@@ -8,7 +8,7 @@ RECOVERY_PATH="/media/sandman/Recovery/secrets"
 
 install-common-packages() {
   echo 'INSTALLING: common-packages'
-  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf
+  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc
   sudo apt remove -y nano
   git lfs install
 }
@@ -210,23 +210,42 @@ install-claude-code() {
 setup-gnome-terminal-gruvbox() {
   type -p dconf || return 0
 
-  # GNOME Terminal requires UUID-formatted profile IDs
-  local profile_uuid="b1dcc9dd-5262-4d8d-a863-c897e6d979b9"
-  local profile_path="/org/gnome/terminal/legacy/profiles:/:${profile_uuid}/"
+  # Single "Gruvbox" profile whose palette theme-sync rewrites in place on toggle.
+  # UUID matches ~/.config/theme-sync.env.
+  local uuid="b1dcc9dd-5262-4d8d-a863-c897e6d979b9"
+  local path="/org/gnome/terminal/legacy/profiles:/:${uuid}/"
 
-  # Set profile list and default
-  dconf write /org/gnome/terminal/legacy/profiles:/list "['${profile_uuid}']"
-  dconf write /org/gnome/terminal/legacy/profiles:/default "'${profile_uuid}'"
+  dconf write /org/gnome/terminal/legacy/profiles:/list "['${uuid}']"
+  dconf write /org/gnome/terminal/legacy/profiles:/default "'${uuid}'"
 
-  # Gruvbox Dark colors
-  dconf write "${profile_path}visible-name" "'Gruvbox Dark'"
-  dconf write "${profile_path}background-color" "'#282828'"
-  dconf write "${profile_path}foreground-color" "'#ebdbb2'"
-  dconf write "${profile_path}use-theme-colors" "false"
-  dconf write "${profile_path}palette" "['#282828','#cc241d','#98971a','#d79921','#458588','#b16286','#689d6a','#a89984','#928374','#fb4934','#b8bb26','#fabd2f','#83a598','#d3869b','#8ec07c','#ebdbb2']"
-  dconf write "${profile_path}bold-is-bright" "true"
-  dconf write "${profile_path}font" "'UbuntuMono Nerd Font 16'"
-  dconf write "${profile_path}use-system-font" "false"
+  dconf write "${path}visible-name" "'Gruvbox'"
+  dconf write "${path}use-theme-colors" "false"
+  dconf write "${path}bold-is-bright" "true"
+  dconf write "${path}font" "'UbuntuMono Nerd Font 16'"
+  dconf write "${path}use-system-font" "false"
+  # Seed with dark palette; theme-sync will overwrite to match current color-scheme.
+  dconf write "${path}background-color" "'#282828'"
+  dconf write "${path}foreground-color" "'#ebdbb2'"
+  dconf write "${path}palette" "['#282828','#cc241d','#98971a','#d79921','#458588','#b16286','#689d6a','#a89984','#928374','#fb4934','#b8bb26','#fabd2f','#83a598','#d3869b','#8ec07c','#ebdbb2']"
+}
+
+setup-gruvbox-gtk-theme() {
+  [[ -d "$HOME/.themes/Gruvbox-Dark" ]] && return 0
+  echo 'INSTALLING: Gruvbox-GTK-Theme'
+  type -p sassc || install-common-packages
+  local src=/tmp/gruvbox-gtk-theme
+  rm -rf "$src"
+  git clone --depth=1 https://github.com/Fausto-Korpsvart/Gruvbox-GTK-Theme.git "$src"
+  "$src/themes/install.sh" -d "$HOME/.themes"
+  rm -rf "$src"
+}
+
+setup-theme-sync() {
+  echo 'ENABLING: theme-sync.service (gsettings -> tmux/starship/terminal/GTK)'
+  systemctl --user daemon-reload
+  systemctl --user enable --now theme-sync.service
+  # Apply once so current state matches the GNOME color-scheme.
+  "$HOME/.local/bin/theme-sync"
 }
 
 setup-terminal() {
@@ -251,8 +270,10 @@ setup-terminal() {
     fi
   fi
 
-  # Setup GNOME Terminal Gruvbox Dark profile
+  # Setup GNOME Terminal Gruvbox profiles (dark + light)
   setup-gnome-terminal-gruvbox
+  setup-gruvbox-gtk-theme
+  setup-theme-sync
 }
 
 echo 'UPDATING: APT Repository Lists'

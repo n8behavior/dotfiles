@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Flip GNOME color-scheme between dark and light.
+# The theme-sync.service listener will fan out to tmux/starship/terminal/GTK.
+set -euo pipefail
+
+current=$(gsettings get org.gnome.desktop.interface color-scheme)
+case "$current" in
+    *prefer-dark*) next=default      ;;
+    *)             next=prefer-dark  ;;
+esac
+gsettings set org.gnome.desktop.interface color-scheme "$next"

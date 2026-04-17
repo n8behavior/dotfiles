@@ -1,0 +1,14 @@
+[Unit]
+Description=Gruvbox theme fanout — reacts to GNOME color-scheme changes
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStartPre=%h/.local/bin/theme-sync
+ExecStart=/bin/sh -c 'gsettings monitor org.gnome.desktop.interface color-scheme | while read -r _; do %h/.local/bin/theme-sync; done'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

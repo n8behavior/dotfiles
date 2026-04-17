@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Fan out GNOME color-scheme to tmux, starship, gnome-terminal, GTK chrome.
+# Source of truth: org.gnome.desktop.interface color-scheme
+# Idempotent; safe to invoke at any time.
+set -euo pipefail
+
+env_file="${XDG_CONFIG_HOME:-$HOME/.config}/theme-sync.env"
+[ -f "$env_file" ] && . "$env_file"
+
+scheme=$(gsettings get org.gnome.desktop.interface color-scheme)
+case "$scheme" in
+    *prefer-dark*) mode=dark  ;;
+    *)             mode=light ;;
+esac
+
+tmux_theme="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/theme.conf"
+mkdir -p "$(dirname "$tmux_theme")"
+printf "set -g @tmux-gruvbox '%s'\n" "$mode" > "$tmux_theme"
+if command -v tmux >/dev/null && tmux list-sessions >/dev/null 2>&1; then
+    tmux set-option -g @tmux-gruvbox "$mode"
+    "$HOME/.tmux/plugins/tmux-gruvbox/gruvbox-tpm.tmux"
+fi
+
+starship_toml="${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml"
+if [ -f "$starship_toml" ]; then
+    sed -i "s/^palette = .*/palette = 'gruvbox_$mode'/" "$starship_toml"
+fi
+
+# gnome-terminal: rewrite the single Gruvbox profile's palette in place.
+# VTE reacts to dconf changes instantly, so all open terminals flip live.
+if [ -n "${GRUVBOX_TERM_UUID:-}" ]; then
+    profile_path="/org/gnome/terminal/legacy/profiles:/:${GRUVBOX_TERM_UUID}/"
+    if [ "$mode" = dark ]; then
+        dconf write "${profile_path}background-color" "'#282828'"
+        dconf write "${profile_path}foreground-color" "'#ebdbb2'"
+        dconf write "${profile_path}palette" \
+            "['#282828', '#cc241d', '#98971a', '#d79921', '#458588', '#b16286', '#689d6a', '#a89984', '#928374', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#ebdbb2']"
+    else
+        dconf write "${profile_path}background-color" "'#fbf1c7'"
+        dconf write "${profile_path}foreground-color" "'#3c3836'"
+        dconf write "${profile_path}palette" \
+            "['#fbf1c7', '#cc241d', '#98971a', '#d79921', '#458588', '#b16286', '#689d6a', '#7c6f64', '#928374', '#9d0006', '#79740e', '#b57614', '#076678', '#8f3f71', '#427b58', '#3c3836']"
+    fi
+fi
+
+if [ "$mode" = dark ]; then
+    gtk_theme=Gruvbox-Dark
+else
+    gtk_theme=Gruvbox-Light
+fi
+if [ -d "$HOME/.themes/$gtk_theme" ] || [ -d "/usr/share/themes/$gtk_theme" ]; then
+    gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+fi

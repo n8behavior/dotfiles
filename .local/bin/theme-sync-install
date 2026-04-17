@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Idempotent install for theme-sync. Bootstrap-dotfiles calls the same steps inline;
+# this script is for running after pulling dotfiles updates on an existing machine.
+set -euo pipefail
+
+# GTK theme: install Gruvbox-GTK-Theme to ~/.themes if missing.
+if [ ! -d "$HOME/.themes/Gruvbox-Dark" ]; then
+    echo "--> installing Gruvbox-GTK-Theme"
+    command -v sassc >/dev/null || {
+        echo "error: sassc not installed; run 'sudo apt install sassc' first" >&2
+        exit 1
+    }
+    src=/tmp/gruvbox-gtk-theme
+    rm -rf "$src"
+    git clone --depth=1 https://github.com/Fausto-Korpsvart/Gruvbox-GTK-Theme.git "$src"
+    "$src/themes/install.sh" -d "$HOME/.themes"
+    rm -rf "$src"
+fi
+
+# Systemd listener
+systemctl --user daemon-reload
+systemctl --user enable --now theme-sync.service
+
+# Apply once so current state matches color-scheme
+"$HOME/.local/bin/theme-sync"
