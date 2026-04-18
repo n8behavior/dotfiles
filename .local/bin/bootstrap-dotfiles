@@ -191,6 +191,33 @@ setup-rust() {
   rustup component add rust-analyzer
 }
 
+install-golang() {
+  echo 'INSTALLING: Go (upstream from go.dev)'
+  type -p curl || install-common-packages
+  local arch latest current
+  arch=$(dpkg --print-architecture)
+  latest=$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -n1)
+  if [[ -z "$latest" ]]; then
+    echo "ERROR: could not fetch latest Go version from go.dev"
+    return 1
+  fi
+  if [[ -x /usr/local/go/bin/go ]]; then
+    current=$(/usr/local/go/bin/go version | awk '{print $3}')
+  fi
+  if [[ "$current" == "$latest" ]]; then
+    echo "Go ${latest} already installed"
+    return 0
+  fi
+  echo "Installing ${latest} (was: ${current:-none})"
+  local tmp
+  tmp=$(mktemp -d)
+  curl -fsSL "https://go.dev/dl/${latest}.linux-${arch}.tar.gz" -o "$tmp/go.tar.gz"
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf "$tmp/go.tar.gz"
+  rm -rf "$tmp"
+  /usr/local/go/bin/go version
+}
+
 install-claude-code() {
   echo 'INSTALLING: Claude Code CLI'
   type -p claude && {
@@ -336,6 +363,7 @@ echo 'INSTALLING: Extra Goodies'
 install-atuin
 install-nvm
 install-fzf
+install-golang
 setup-editor
 install-lazyvim
 setup-terminal

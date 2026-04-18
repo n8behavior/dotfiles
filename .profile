@@ -30,3 +30,4 @@ if [ -e $HOME/.cargo/env ]; then
 fi
 
 [[ -f "$HOME/.atuin/bin/env" ]] && . "$HOME/.atuin/bin/env"
+export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
