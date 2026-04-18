@@ -16,13 +16,12 @@
 !.config/nvim/lua/plugins/colorscheme.lua
 !.config/nvim/spell/
 !.config/nvim/spell/**
-!.config/starship.toml
+!.config/starship.toml.in
 !.config/systemd/
 !.config/systemd/user/
 !.config/systemd/user/theme-sync.service
 !.config/theme-sync.env
 !.config/tmux/
-!.config/tmux/theme.conf
 !.config/wireplumber/
 !.config/wireplumber/bluetooth.lua.d/
 !.config/wireplumber/bluetooth.lua.d/**

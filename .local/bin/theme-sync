@@ -22,6 +22,10 @@ if command -v tmux >/dev/null && tmux list-sessions >/dev/null 2>&1; then
 fi
 
 starship_toml="${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml"
+starship_template="${starship_toml}.in"
+if [ ! -f "$starship_toml" ] && [ -f "$starship_template" ]; then
+    cp "$starship_template" "$starship_toml"
+fi
 if [ -f "$starship_toml" ]; then
     sed -i "s/^palette = .*/palette = 'gruvbox_$mode'/" "$starship_toml"
 fi
