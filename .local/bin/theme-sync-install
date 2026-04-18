@@ -4,17 +4,18 @@
 set -euo pipefail
 
 # GTK theme: install Gruvbox-GTK-Theme to ~/.themes if missing.
+# Optional — theme-sync skips the GTK chrome step when the theme isn't present.
 if [ ! -d "$HOME/.themes/Gruvbox-Dark" ]; then
-    echo "--> installing Gruvbox-GTK-Theme"
-    command -v sassc >/dev/null || {
-        echo "error: sassc not installed; run 'sudo apt install sassc' first" >&2
-        exit 1
-    }
-    src=/tmp/gruvbox-gtk-theme
-    rm -rf "$src"
-    git clone --depth=1 https://github.com/Fausto-Korpsvart/Gruvbox-GTK-Theme.git "$src"
-    "$src/themes/install.sh" -d "$HOME/.themes"
-    rm -rf "$src"
+    if command -v sassc >/dev/null; then
+        echo "--> installing Gruvbox-GTK-Theme"
+        src=/tmp/gruvbox-gtk-theme
+        rm -rf "$src"
+        git clone --depth=1 https://github.com/Fausto-Korpsvart/Gruvbox-GTK-Theme.git "$src"
+        "$src/themes/install.sh" -d "$HOME/.themes"
+        rm -rf "$src"
+    else
+        echo "--> skipping Gruvbox-GTK-Theme: sassc not installed (run 'sudo apt install sassc' and rerun to enable GTK chrome theming)" >&2
+    fi
 fi
 
 # Systemd listener
