@@ -156,11 +156,12 @@ if [ -d "$HOME/.local/bin" ]; then
   PATH="$HOME/.local/bin:$PATH"
 fi
 
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '/home/sandman/google-cloud-sdk/path.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/path.bash.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '/home/sandman/google-cloud-sdk/completion.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/completion.bash.inc'; fi
+# Google Cloud SDK — system install at /usr/lib/google-cloud-sdk
+# (the old ~/google-cloud-sdk paths were stale and never loaded).
+# path.bash.inc isn't shipped for the system install; /usr/bin/gcloud
+# is already on PATH, so only completion needs sourcing here.
+if [ -f '/usr/lib/google-cloud-sdk/path.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/path.bash.inc'; fi
+if [ -f '/usr/lib/google-cloud-sdk/completion.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/completion.bash.inc'; fi
 
 . "$HOME/.atuin/bin/env"
 
