@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# wifi-reset — recover a wedged MediaTek MT7921/MT7922 (mt7921e) adapter without
+# rebooting. Self-contained and self-detecting: on a machine with a different
+# Wi-Fi NIC it finds no mt7921e device and exits cleanly, so it's safe to ship
+# to every box via dotfiles.
+#
+# Failure mode it targets (see pop-os/linux#409, bugzilla.kernel.org#221356):
+# the card enumerates and scans fine but the first authentication times out and
+# wpa_supplicant blocklists the BSS ("ignore list count incremented ...
+# ssid-not-found"). The firmware is wedged and needs re-init. We escalate to the
+# cheapest action that actually clears it:
+#   1. radio toggle      (clears the supplicant ignore-list, cheap)
+#   2. driver reload     (re-downloads firmware)
+#   3. PCI remove+rescan (full re-enumeration — a "reboot" for just the card)
+#
+# Usage: wifi-reset [--force]   (re-execs itself with sudo if not root)
+set -uo pipefail
+
+DRV=mt7921e
+
+log() { printf '\033[1;34m[wifi-reset]\033[0m %s\n' "$*"; }
+
+# PCI address(es) currently bound to the mt7921e driver, if any.
+driver_pcis() { ls -1 "/sys/bus/pci/drivers/$DRV/" 2>/dev/null | grep -E '^[0-9a-f]{4}:'; }
+
+# Netdev name for the (first) mt7921e device, resolved fresh each call since it
+# disappears/returns across a reload or PCI rescan.
+wifi_iface() {
+  local pci net
+  pci=$(driver_pcis | head -1) || return 1
+  [ -n "$pci" ] || return 1
+  net=$(ls -1 "/sys/bus/pci/devices/$pci/net/" 2>/dev/null | head -1)
+  [ -n "$net" ] && echo "$net"
+}
+
+connected() {
+  local i=$1
+  [ -n "$i" ] && nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep -q "^${i}:connected$"
+}
+
+wait_connected() {  # $1 = seconds
+  local t=$1 i=0 dev
+  while [ "$i" -lt "$t" ]; do
+    dev=$(wifi_iface)
+    connected "$dev" && return 0
+    sleep 1; i=$((i+1))
+  done
+  return 1
+}
+
+# --- detect hardware; no-op on machines without this chip -------------------
+PCI=$(driver_pcis | head -1)
+if [ -z "$PCI" ]; then
+  log "no $DRV (MT7921/MT7922) adapter on this machine — nothing to do"
+  exit 0
+fi
+
+if [ "$(id -u)" -ne 0 ]; then exec sudo "$0" "$@"; fi
+
+IFACE=$(wifi_iface)
+log "adapter: $DRV @ $PCI  iface: ${IFACE:-<down>}"
+
+if [ -n "$IFACE" ] && connected "$IFACE" && [ "${1:-}" != "--force" ]; then
+  log "$IFACE already connected — nothing to do (pass --force to reset anyway)"
+  exit 0
+fi
+
+# 1) Soft: bounce the radio; also clears the supplicant BSS ignore-list.
+log "step 1/3: toggling wifi radio"
+nmcli radio wifi off; sleep 2; nmcli radio wifi on
+if wait_connected 15; then log "recovered via radio toggle ✔"; exit 0; fi
+
+# 2) Reload the driver (re-downloads firmware).
+log "step 2/3: reloading $DRV driver"
+modprobe -r "$DRV" 2>/dev/null
+sleep 2
+modprobe "$DRV"
+if wait_connected 20; then log "recovered via driver reload ✔"; exit 0; fi
+
+# 3) Hardest: re-enumerate the PCI device — full power cycle + firmware reload.
+log "step 3/3: PCI remove + rescan ($PCI)"
+modprobe -r "$DRV" 2>/dev/null
+echo 1 > "/sys/bus/pci/devices/$PCI/remove"
+sleep 3
+echo 1 > /sys/bus/pci/rescan
+sleep 2
+modprobe "$DRV" 2>/dev/null   # usually auto-bound by rescan; harmless if loaded
+if wait_connected 30; then log "recovered via PCI rescan ✔"; exit 0; fi
+
+log "ERROR: still not connected after full reset."
+log "  inspect: nmcli device wifi list ; journalctl -k -b -g $DRV"
+exit 1

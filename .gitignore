@@ -42,6 +42,7 @@
 !.local/bin/theme-sync
 !.local/bin/theme-sync-install
 !.local/bin/theme-toggle
+!.local/bin/wifi-reset
 !.local/etc/
 !.local/etc/settings.json
 !.profile
