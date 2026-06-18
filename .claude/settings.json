@@ -4,7 +4,8 @@
     "defaultMode": "auto"
   },
   "env": {
-    "DISABLE_TELEMETRY": "1"
+    "DISABLE_TELEMETRY": "1",
+    "BASH_ENV": "/home/sandman/.bash_functions"
   },
   "includeCoAuthoredBy": false,
   "hooks": {
