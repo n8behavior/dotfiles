@@ -23,6 +23,7 @@
   },
   "alwaysThinkingEnabled": true,
   "tui": "default",
+  "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "voiceEnabled": true,
   "feedbackSurveyState": {
