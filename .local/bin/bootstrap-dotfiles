@@ -95,6 +95,16 @@ restore-secrets() {
   passage show claude/credentials > ~/.claude/.credentials.json
   chmod 600 ~/.claude/.credentials.json
 
+  # Restore FIDO2 PAM mapping (absent until the first key is enrolled)
+  if passage show yubico/u2f_keys &> /dev/null; then
+    echo "Restoring FIDO2 PAM mapping..."
+    mkdir -p ~/.config/Yubico && chmod 700 ~/.config/Yubico
+    passage show yubico/u2f_keys > ~/.config/Yubico/u2f_keys
+    chmod 600 ~/.config/Yubico/u2f_keys
+  else
+    echo "SKIPPING: FIDO2 PAM mapping (not yet in passage)"
+  fi
+
   echo "Secrets restored successfully!"
 }
 
@@ -369,3 +379,6 @@ install-lazyvim
 setup-terminal
 install-claude-code
 cargo install aichat
+
+# No-ops until a key is enrolled with enroll-fido-key
+setup-fido-login

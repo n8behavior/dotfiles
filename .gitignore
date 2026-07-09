@@ -36,6 +36,8 @@
 !.local/
 !.local/bin/
 !.local/bin/bootstrap-dotfiles
+!.local/bin/enroll-fido-key
+!.local/bin/setup-fido-login
 !.local/bin/start-issue
 !.local/bin/close-issue
 !.local/bin/markdownlint-cli2
@@ -44,6 +46,7 @@
 !.local/bin/theme-toggle
 !.local/bin/wifi-reset
 !.local/etc/
+!.local/etc/fido-login.env
 !.local/etc/settings.json
 !.profile
 !.selected_editor

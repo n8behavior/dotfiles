@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Wire enrolled FIDO2 credentials into PAM: GDM login, screen unlock, sudo, su,
+# polkit. Idempotent -- safe to run from bootstrap-dotfiles on every refresh.
+#
+# The key is a *primary* auth factor, not a second one: touch+PIN succeeds
+# outright, and any failure falls through to the password prompt. There is no
+# configuration here that can lock you out.
+#
+# Enroll first with enroll-fido-key.
+
+set -euo pipefail
+
+CONFIG="$HOME/.local/etc/fido-login.env"
+AUTHFILE="$HOME/.config/Yubico/u2f_keys"
+PROFILE=/usr/share/pam-configs/n8-u2f
+SELFTEST=/etc/pam.d/n8-u2f-selftest
+SSHD_DROPIN=/etc/ssh/sshd_config.d/10-no-password-auth.conf
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+step() { echo; echo "==> $*"; }
+
+[[ $EUID -ne 0 ]] || die "run as your normal user, not root (needs \$HOME); it will sudo as needed"
+
+[[ -r $CONFIG ]] || die "missing $CONFIG"
+# shellcheck source=/dev/null
+. "$CONFIG"
+[[ -n ${FIDO_ORIGIN:-} && -n ${FIDO_APPID:-} ]] || die "$CONFIG must set FIDO_ORIGIN and FIDO_APPID"
+
+PAM_ARGS="cue origin=$FIDO_ORIGIN appid=$FIDO_APPID pinverification=1"
+
+if [[ ! -s $AUTHFILE ]] || ! grep -q "^${USER}:" "$AUTHFILE"; then
+  echo "SKIPPING: fido login (no credentials in $AUTHFILE)"
+  echo "  Enroll a key with enroll-fido-key, or restore the mapping from passage."
+  exit 0
+fi
+
+step 'INSTALLING: pam-u2f tooling'
+missing=()
+for pkg in libpam-u2f pamu2fcfg pamtester; do
+  dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
+done
+if (( ${#missing[@]} )); then
+  sudo apt install -y "${missing[@]}"
+else
+  echo "already present"
+fi
+
+# Self-test before touching the real auth stack. The mapping file records key
+# handles but not the origin they were registered against, so a mismatched
+# FIDO_ORIGIN is only detectable by actually authenticating.
+step 'VERIFYING: credentials authenticate against this origin'
+printf 'auth required pam_u2f.so %s\n' "$PAM_ARGS" | sudo tee "$SELFTEST" > /dev/null
+echo "Touch the key and enter its PIN."
+pamtester "$(basename "$SELFTEST")" "$USER" authenticate \
+  || die "self-test failed; PAM left unchanged. Check that FIDO_ORIGIN matches the value used at enrollment."
+echo "Self-test passed."
+
+# Authentication belongs in common-auth, never in a per-service file: a
+# pam_u2f line in /etc/pam.d/<service> runs ahead of common-auth and, if
+# sufficient, short-circuits the stack before this profile is consulted.
+step 'INSTALLING: pam-auth-update profile'
+sudo tee "$PROFILE" > /dev/null <<PROFILE_EOF
+Name: FIDO2 authentication (n8behavior)
+Default: no
+Priority: 384
+Auth-Type: Primary
+Auth:
+	[success=end default=ignore]	pam_u2f.so	$PAM_ARGS
+Auth-Initial:
+	[success=end default=ignore]	pam_u2f.so	$PAM_ARGS
+PROFILE_EOF
+
+sudo pam-auth-update --package --enable n8-u2f
+grep -q pam_u2f /etc/pam.d/common-auth \
+  || die "pam-auth-update did not apply; /etc/pam.d/common-auth may be locally modified (see pam-auth-update(8) --force)"
+echo "common-auth now offers the key before the password."
+
+# The PIN requirement lives in common-auth. A pam_u2f line in any per-service
+# file runs ahead of it and, if sufficient, short-circuits the stack -- so that
+# service would authenticate on whatever terms the stray line sets. Assert that
+# common-auth is the only place pam_u2f appears.
+shadowing=$(grep -rlE '^[^#]*pam_u2f\.so' /etc/pam.d/ 2> /dev/null \
+  | grep -vE "/(common-auth|$(basename "$SELFTEST"))$" || true)
+if [[ -n $shadowing ]]; then
+  echo
+  echo "WARNING: pam_u2f configured outside common-auth. These files run first"
+  echo "  and may authenticate without a PIN:"
+  sed 's/^/    /' <<< "$shadowing"
+fi
+
+# sshd includes common-auth. With PasswordAuthentication on, a remote login would
+# run the u2f stack and cue a touch on the authenticator physically attached to
+# the *server*. Pubkey auth is unaffected.
+step 'HARDENING: sshd (no password auth)'
+if ! dpkg -s openssh-server &> /dev/null; then
+  echo "openssh-server not installed; nothing to harden"
+else
+  if [[ ! -f $SSHD_DROPIN ]]; then
+    sudo tee "$SSHD_DROPIN" > /dev/null <<'SSHD_EOF'
+# common-auth now includes pam_u2f; a password login would cue a touch on the
+# server's own authenticator. Pubkey auth is unaffected.
+PasswordAuthentication no
+SSHD_EOF
+    echo "wrote $SSHD_DROPIN"
+  else
+    echo "already present"
+  fi
+
+  # -G parses the config and its includes. Unlike -t it does not require the
+  # privilege-separation directory, which does not exist until sshd first runs.
+  sshd -G -f /etc/ssh/sshd_config > /dev/null \
+    || die "sshd rejected the config; review $SSHD_DROPIN"
+
+  # Ubuntu socket-activates sshd: ssh.socket is active, ssh.service is not, and
+  # each connection spawns a fresh sshd that re-reads the config. Only a
+  # long-running ssh.service needs to be told.
+  if systemctl is-active --quiet ssh.service; then
+    sudo systemctl reload ssh.service
+  fi
+  echo "config valid"
+fi
+
+if type -p etckeeper > /dev/null; then
+  sudo etckeeper commit 'fido login: enable pam_u2f via pam-auth-update' &> /dev/null || true
+fi
+
+cat <<'DONE'
+
+==> Done. Verify in this order, keeping a root shell open:
+
+  1. sudo -k && sudo true      touch + PIN
+  2. Super+L                   lock screen (recoverable from a TTY)
+  3. reboot                    GDM greeter
+
+Your password still works everywhere the key does. On first use of a
+credential store each session, GNOME will ask for your keyring password:
+pam_u2f has no secret to hand it, so that prompt is expected.
+DONE

@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Enroll a FIDO2 authenticator (YubiKey) for PAM authentication.
+#
+# Appends a credential to ~/.config/Yubico/u2f_keys, pinned to the shared
+# origin in ~/.local/etc/fido-login.env so the mapping works on every host.
+# Run once per key, with only that key attached.
+
+set -euo pipefail
+
+CONFIG="$HOME/.local/etc/fido-login.env"
+AUTHFILE="$HOME/.config/Yubico/u2f_keys"
+PASSAGE_ENTRY="yubico/u2f_keys"
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+[[ -r $CONFIG ]] || die "missing $CONFIG"
+# shellcheck source=/dev/null
+. "$CONFIG"
+[[ -n ${FIDO_ORIGIN:-} && -n ${FIDO_APPID:-} ]] || die "$CONFIG must set FIDO_ORIGIN and FIDO_APPID"
+
+type -p pamu2fcfg > /dev/null || die "pamu2fcfg not found; run: sudo apt install pamu2fcfg"
+
+attached=$(ykman list 2>/dev/null | wc -l)
+case "$attached" in
+  0) die "no YubiKey detected" ;;
+  1) echo "Enrolling: $(ykman list 2>/dev/null)" ;;
+  *) die "$attached YubiKeys attached; enroll one at a time so the right key is registered" ;;
+esac
+
+ykman fido info 2>/dev/null | grep -q '^PIN:.*remaining' \
+  || die "this key has no FIDO PIN set; run: ykman fido access change-pin"
+
+echo
+echo "Touch the key when it blinks, and enter its FIDO PIN when prompted."
+echo
+
+# -n prints only the credential, for appending. Capture and normalise rather
+# than shell-appending: the raw output carries a trailing newline, and we want
+# to control the ':' separator ourselves.
+raw=$(pamu2fcfg --origin="$FIDO_ORIGIN" --appid="$FIDO_APPID" --pin-verification --nouser) \
+  || die "registration failed"
+
+cred=$(tr -d '\r\n' <<< "$raw")
+cred="${cred#:}"
+
+[[ $(awk -F, '{print NF}' <<< "$cred") -eq 4 ]] \
+  || die "unexpected credential format from pamu2fcfg: $cred"
+[[ $cred == *"+pin"* ]] \
+  || die "credential is not PIN-protected; expected +pin in options field"
+
+handle="${cred%%,*}"
+mkdir -p "$(dirname "$AUTHFILE")"
+chmod 700 "$(dirname "$AUTHFILE")"
+
+if [[ -s $AUTHFILE ]] && grep -q "$handle" "$AUTHFILE"; then
+  die "this key is already enrolled"
+fi
+
+tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+
+if [[ -s $AUTHFILE ]] && grep -q "^${USER}:" "$AUTHFILE"; then
+  [[ -f $AUTHFILE ]] && cp -a "$AUTHFILE" "$AUTHFILE.bak"
+  # Append to the existing line; pam_u2f accepts N credentials per user,
+  # colon-separated, and tries each in turn.
+  awk -v u="$USER" -v c="$cred" -F: \
+    '$1 == u { print $0 ":" c; next } { print }' "$AUTHFILE" > "$tmp"
+else
+  [[ -f $AUTHFILE ]] && cp -a "$AUTHFILE" "$AUTHFILE.bak"
+  { [[ -s $AUTHFILE ]] && grep -v "^${USER}:" "$AUTHFILE"; echo "${USER}:${cred}"; } > "$tmp"
+fi
+
+install -m 600 "$tmp" "$AUTHFILE"
+
+count=$(awk -v u="$USER" -F: '$1 == u { print NF - 1 }' "$AUTHFILE")
+echo
+echo "Enrolled. $USER now has $count credential(s) in $AUTHFILE"
+
+if type -p passage > /dev/null && [[ -d $HOME/.passage/store ]]; then
+  echo "Syncing mapping to passage ($PASSAGE_ENTRY)..."
+  passage insert -f -m "$PASSAGE_ENTRY" < "$AUTHFILE" > /dev/null
+  echo "Synced. Other hosts pick this up via restore-secrets."
+else
+  echo "NOTE: passage unavailable; $AUTHFILE not backed up."
+fi
+
+echo
+echo "Next: run setup-fido-login to wire this into PAM (it self-tests first)."
