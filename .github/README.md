@@ -25,6 +25,98 @@ git restore .
 All paths in the `worktree` are ignored by default and must be explicitly
 added in the `.gitigore`.
 
+## YubiKey login (FIDO2 / pam-u2f)
+
+Touch + PIN replaces the password at the GDM greeter, the lock screen, `sudo`,
+`su` and polkit. The key is a *primary* factor, not a second one: if it
+succeeds you are in, and **any failure falls through to the password prompt**.
+Nothing here can lock you out.
+
+```
+common-auth ──► pam_u2f.so   (priority 384, [success=end default=ignore])
+                    │ success ──► done
+                    │ fail    ──► pam_unix.so ──► password
+```
+
+### Why the origin is pinned
+
+FIDO2 credentials are bound to the relying-party ID they were registered
+against, and both `pamu2fcfg` and `pam_u2f` default it to `pam://$HOSTNAME`.
+That silently produces credentials that only work on the machine that created
+them. `.local/etc/fido-login.env` pins it to `pam://n8behavior` on both the
+enroll and the verify side, so one mapping authenticates on every host.
+
+**Changing `FIDO_ORIGIN` invalidates every enrolled credential.** The mapping
+file records key handles but not the origin, so a mismatch is undetectable
+until you actually try to authenticate — which is why `setup-fido-login`
+self-tests with `pamtester` before it touches PAM.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `enroll-fido-key` | Register one attached YubiKey against the pinned origin, append it to `~/.config/Yubico/u2f_keys`, and sync the mapping to passage. Refuses to run with two keys attached, with a key that has no FIDO PIN, or if the credential comes back without `+pin`. Run once per key. |
+| `setup-fido-login` | Idempotent. Installs the `pam-auth-update` profile and enables it, then asserts the profile reached `common-auth` and that `pam_u2f` appears nowhere else. Self-tests with `pamtester` first and aborts before changing PAM if that fails. Called from `bootstrap-dotfiles`; a no-op until a key is enrolled. |
+
+### New machine
+
+Mount the Recovery drive and run `bootstrap-dotfiles`. `restore-secrets` writes
+`~/.config/Yubico/u2f_keys` from passage, and `setup-fido-login` picks it up at
+the end. Both keys are already in the mapping, so no re-enrollment is needed —
+only the key attached to that machine has to be present.
+
+### New key
+
+`enroll-fido-key` (appends to the same `sandman:` line), then push the mapping
+to the Recovery drive with `sync-secrets push`. A key used on a new machine
+also needs an age identity for passage — see the Recovery drive's README.
+
+### Files
+
+- `.local/bin/enroll-fido-key`, `.local/bin/setup-fido-login`
+- `.local/etc/fido-login.env` — pinned `FIDO_ORIGIN` / `FIDO_APPID`, shared by both scripts
+- `~/.config/Yubico/u2f_keys` — credential mapping, one line, one credential per key. Gitignored; lives in passage as `yubico/u2f_keys`
+- `/usr/share/pam-configs/n8-u2f` — the profile, installed by `setup-fido-login`
+- `/etc/pam.d/n8-u2f-selftest` — service used by `pamtester`; nothing else reads it
+- `/etc/ssh/sshd_config.d/10-no-password-auth.conf` — see below
+
+### Gotchas
+
+- **The GNOME keyring stops auto-unlocking.** `pam_gnome_keyring` derives the
+  keyring key from the password you typed; `pam_u2f` produces a signature over
+  a random challenge and has no stable secret to hand it. Expect one unlock
+  prompt per session. A non-interactive `git push` or `gh` call *before* you
+  unlock will fail with `could not read Username`, because the token lives in
+  the locked keyring.
+- **`sshd` includes `common-auth`.** With password auth enabled, a remote login
+  would cue a touch on the authenticator attached to the *server*.
+  `setup-fido-login` drops in `PasswordAuthentication no`. Pubkey auth is
+  unaffected.
+- **`NOPASSWD` in sudoers bypasses PAM entirely.** `sudo` then never consults
+  `pam_u2f`, so no touch, no PIN. Keep `/etc/sudoers.d/sandman` renamed to
+  `sandman.disabled` (sudo skips filenames containing a dot).
+- **PIV is unreachable over SSH.** `pcsc-lite`'s polkit policy is
+  `allow_active=yes / allow_inactive=no / allow_any=no`, and logind marks an
+  ssh session `Remote=yes`. So `passage show` and anything else touching the
+  PIV applet must be run at the machine. FIDO2 (`pam_u2f`) uses hidraw and is
+  not affected. See the WSL2 section below for the polkit override.
+- **Wrong PINs are expensive.** Three consecutive failures lock the key until
+  reinsert; eight block it permanently, and a FIDO reset destroys every
+  credential on it.
+
+### Disabling it
+
+Your password keeps working throughout, so this is only needed if `pam_u2f`
+itself misbehaves:
+
+```bash
+sudo pam-auth-update --package --remove n8-u2f   # take the key out of the stack
+sudo git -C /etc checkout common-auth            # or restore from etckeeper
+```
+
+From a locked screen: `Ctrl+Alt+F3`, log in with your password, then
+`sudo loginctl unlock-session <id>` (`loginctl list-sessions` to find it).
+
 ## Gruvbox theme sync (dark / light)
 
 GNOME's `org.gnome.desktop.interface color-scheme` is the single source of
