@@ -95,9 +95,11 @@ restore-secrets() {
   passage show claude/credentials > ~/.claude/.credentials.json
   chmod 600 ~/.claude/.credentials.json
 
-  # Restore FIDO2 PAM mapping (absent until the first key is enrolled)
-  if passage show yubico/u2f_keys &> /dev/null; then
-    echo "Restoring FIDO2 PAM mapping..."
+  # Restore FIDO2 PAM mapping (absent until the first key is enrolled).
+  # Test for the ciphertext rather than decrypting: a decrypt needs the YubiKey
+  # and a touch, and redirecting its output hides the prompt asking for one.
+  if [[ -f "$HOME/.passage/store/yubico/u2f_keys.age" ]]; then
+    echo "Restoring FIDO2 PAM mapping (touch YubiKey when prompted)..."
     mkdir -p ~/.config/Yubico && chmod 700 ~/.config/Yubico
     passage show yubico/u2f_keys > ~/.config/Yubico/u2f_keys
     chmod 600 ~/.config/Yubico/u2f_keys
