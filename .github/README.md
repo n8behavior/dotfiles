@@ -88,6 +88,14 @@ also needs an age identity for passage — see the Recovery drive's README.
   prompt per session. A non-interactive `git push` or `gh` call *before* you
   unlock will fail with `could not read Username`, because the token lives in
   the locked keyring.
+- **Unlock after suspend needs `nodetect`.** The key stays on the USB bus
+  across sleep, but it is still waking from USB suspend when GNOME starts the
+  PAM conversation at lid-open. Without `nodetect`, `pam_u2f` sends a
+  check-only probe first; the half-awake key fails it and the stack silently
+  falls through to the password. `nodetect` skips the probe and starts the
+  real assertion, whose PIN prompt gives the key the seconds it needs. The
+  trade-off: an attached FIDO device with no enrolled credential now draws a
+  touch cue that cannot succeed before the password prompt appears.
 - **`sshd` includes `common-auth`.** With password auth enabled, a remote login
   would cue a touch on the authenticator attached to the *server*.
   `setup-fido-login` drops in `PasswordAuthentication no`. Pubkey auth is

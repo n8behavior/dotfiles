@@ -27,7 +27,12 @@ step() { echo; echo "==> $*"; }
 . "$CONFIG"
 [[ -n ${FIDO_ORIGIN:-} && -n ${FIDO_APPID:-} ]] || die "$CONFIG must set FIDO_ORIGIN and FIDO_APPID"
 
-PAM_ARGS="cue origin=$FIDO_ORIGIN appid=$FIDO_APPID pinverification=1"
+# nodetect: skip the check-only probe pam_u2f normally sends before starting
+# the real assertion. Right after resume from suspend the key is enumerated
+# but still waking from USB suspend, so the probe fails and the stack silently
+# falls through to the password. The real assertion opens with the PIN prompt,
+# which gives the key time to wake; with no key attached it still fails fast.
+PAM_ARGS="cue origin=$FIDO_ORIGIN appid=$FIDO_APPID pinverification=1 nodetect"
 
 if [[ ! -s $AUTHFILE ]] || ! grep -q "^${USER}:" "$AUTHFILE"; then
   echo "SKIPPING: fido login (no credentials in $AUTHFILE)"
