@@ -8,6 +8,7 @@
   "permissions": {
     "defaultMode": "auto"
   },
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "Stop": [
       {
@@ -17,9 +18,7 @@
     ]
   },
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "github@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "tui": "default",
@@ -37,6 +36,5 @@
         "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
       ]
     }
-  },
-  "model": "claude-fable-5[1m]"
+  }
 }
