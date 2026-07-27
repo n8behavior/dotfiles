@@ -134,7 +134,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
 
 # GitHub CLI stuff
-type gh && eval "$(gh completion -s bash)"
+type gh &> /dev/null && eval "$(gh completion -s bash)"
 
 if [ -d .secrets ]; then
   source .secrets/*
