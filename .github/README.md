@@ -96,6 +96,11 @@ also needs an age identity for passage — see the Recovery drive's README.
   real assertion, whose PIN prompt gives the key the seconds it needs. The
   trade-off: an attached FIDO device with no enrolled credential now draws a
   touch cue that cannot succeed before the password prompt appears.
+- **Escape restarts a stalled unlock.** If the lock screen ever lands on the
+  password field instead of the PIN prompt, pressing Escape and interacting
+  again starts a fresh PAM conversation, giving `pam_u2f` another shot at the
+  key. Generic GNOME behavior, but it is the quick recovery for any future
+  timing issue.
 - **`sshd` includes `common-auth`.** With password auth enabled, a remote login
   would cue a touch on the authenticator attached to the *server*.
   `setup-fido-login` drops in `PasswordAuthentication no`. Pubkey auth is
