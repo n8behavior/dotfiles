@@ -56,7 +56,7 @@ self-tests with `pamtester` before it touches PAM.
 | Command | What it does |
 |---|---|
 | `enroll-fido-key` | Register one attached YubiKey against the pinned origin, append it to `~/.config/Yubico/u2f_keys`, and sync the mapping to passage. Refuses to run with two keys attached, with a key that has no FIDO PIN, or if the credential comes back without `+pin`. Run once per key. |
-| `setup-fido-login` | Idempotent. Installs the `pam-auth-update` profile and enables it, then asserts the profile reached `common-auth` and that `pam_u2f` appears nowhere else. Self-tests with `pamtester` first and aborts before changing PAM if that fails. Called from `bootstrap-dotfiles`; a no-op until a key is enrolled. |
+| `setup-fido-login` | Idempotent. Installs the `pam-auth-update` profile and enables it, then asserts the profile reached `common-auth` and that `pam_u2f` appears nowhere else. Self-tests with `pamtester` first and aborts before changing PAM if that fails. Exits early — no touch, no PIN, no sudo — when the installed profile and `common-auth` already match what it would write; any drift (a changed `FIDO_ORIGIN`, new module options, a removed profile) triggers the full re-run. Called from `bootstrap-dotfiles`; a no-op until a key is enrolled. |
 
 ### New machine
 

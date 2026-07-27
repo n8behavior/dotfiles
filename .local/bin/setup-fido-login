@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Wire enrolled FIDO2 credentials into PAM: GDM login, screen unlock, sudo, su,
-# polkit. Idempotent -- safe to run from bootstrap-dotfiles on every refresh.
+# polkit. Idempotent -- safe to run from bootstrap-dotfiles on every refresh,
+# and exits without prompting for a touch or PIN when PAM already matches.
 #
 # The key is a *primary* auth factor, not a second one: touch+PIN succeeds
 # outright, and any failure falls through to the password prompt. There is no
@@ -34,46 +35,61 @@ if [[ ! -s $AUTHFILE ]] || ! grep -q "^${USER}:" "$AUTHFILE"; then
   exit 0
 fi
 
-step 'INSTALLING: pam-u2f tooling'
-missing=()
-for pkg in libpam-u2f pamu2fcfg pamtester; do
-  dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
-done
-if (( ${#missing[@]} )); then
-  sudo apt install -y "${missing[@]}"
-else
-  echo "already present"
-fi
-
-# Self-test before touching the real auth stack. The mapping file records key
-# handles but not the origin they were registered against, so a mismatched
-# FIDO_ORIGIN is only detectable by actually authenticating.
-step 'VERIFYING: credentials authenticate against this origin'
-printf 'auth required pam_u2f.so %s\n' "$PAM_ARGS" | sudo tee "$SELFTEST" > /dev/null
-echo "Touch the key and enter its PIN."
-pamtester "$(basename "$SELFTEST")" "$USER" authenticate \
-  || die "self-test failed; PAM left unchanged. Check that FIDO_ORIGIN matches the value used at enrollment."
-echo "Self-test passed."
-
-# Authentication belongs in common-auth, never in a per-service file: a
-# pam_u2f line in /etc/pam.d/<service> runs ahead of common-auth and, if
-# sufficient, short-circuits the stack before this profile is consulted.
-step 'INSTALLING: pam-auth-update profile'
-sudo tee "$PROFILE" > /dev/null <<PROFILE_EOF
-Name: FIDO2 authentication (n8behavior)
+# The profile content doubles as the idempotency check below: the installed
+# copy must be byte-identical and common-auth must carry the same module line.
+PROFILE_CONTENT="Name: FIDO2 authentication (n8behavior)
 Default: no
 Priority: 384
 Auth-Type: Primary
 Auth:
 	[success=end default=ignore]	pam_u2f.so	$PAM_ARGS
 Auth-Initial:
-	[success=end default=ignore]	pam_u2f.so	$PAM_ARGS
-PROFILE_EOF
+	[success=end default=ignore]	pam_u2f.so	$PAM_ARGS"
 
-sudo pam-auth-update --package --enable n8-u2f
-grep -q pam_u2f /etc/pam.d/common-auth \
-  || die "pam-auth-update did not apply; /etc/pam.d/common-auth may be locally modified (see pam-auth-update(8) --force)"
-echo "common-auth now offers the key before the password."
+# Setup costs a pamtester self-test (PIN + touch) plus a sudo per step, so
+# skip the whole block when PAM already matches what this run would write.
+# Any drift -- a changed FIDO_ORIGIN, new module options, the profile removed
+# by pam-auth-update -- fails the comparison and reruns the full setup.
+pam_changed=false
+if [[ -f $PROFILE ]] \
+  && diff -q "$PROFILE" <(printf '%s\n' "$PROFILE_CONTENT") > /dev/null \
+  && grep -qF "pam_u2f.so $PAM_ARGS" /etc/pam.d/common-auth; then
+  echo "SKIPPING: fido login (common-auth already matches this configuration)"
+else
+  pam_changed=true
+
+  step 'INSTALLING: pam-u2f tooling'
+  missing=()
+  for pkg in libpam-u2f pamu2fcfg pamtester; do
+    dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
+  done
+  if (( ${#missing[@]} )); then
+    sudo apt install -y "${missing[@]}"
+  else
+    echo "already present"
+  fi
+
+  # Self-test before touching the real auth stack. The mapping file records key
+  # handles but not the origin they were registered against, so a mismatched
+  # FIDO_ORIGIN is only detectable by actually authenticating.
+  step 'VERIFYING: credentials authenticate against this origin'
+  printf 'auth required pam_u2f.so %s\n' "$PAM_ARGS" | sudo tee "$SELFTEST" > /dev/null
+  echo "Touch the key and enter its PIN."
+  pamtester "$(basename "$SELFTEST")" "$USER" authenticate \
+    || die "self-test failed; PAM left unchanged. Check that FIDO_ORIGIN matches the value used at enrollment."
+  echo "Self-test passed."
+
+  # Authentication belongs in common-auth, never in a per-service file: a
+  # pam_u2f line in /etc/pam.d/<service> runs ahead of common-auth and, if
+  # sufficient, short-circuits the stack before this profile is consulted.
+  step 'INSTALLING: pam-auth-update profile'
+  printf '%s\n' "$PROFILE_CONTENT" | sudo tee "$PROFILE" > /dev/null
+
+  sudo pam-auth-update --package --enable n8-u2f
+  grep -q pam_u2f /etc/pam.d/common-auth \
+    || die "pam-auth-update did not apply; /etc/pam.d/common-auth may be locally modified (see pam-auth-update(8) --force)"
+  echo "common-auth now offers the key before the password."
+fi
 
 # The PIN requirement lives in common-auth. A pam_u2f line in any per-service
 # file runs ahead of it and, if sufficient, short-circuits the stack -- so that
@@ -92,6 +108,7 @@ fi
 # run the u2f stack and cue a touch on the authenticator physically attached to
 # the *server*. Pubkey auth is unaffected.
 step 'HARDENING: sshd (no password auth)'
+sshd_changed=false
 if ! dpkg -s openssh-server &> /dev/null; then
   echo "openssh-server not installed; nothing to harden"
 else
@@ -101,6 +118,7 @@ else
 # server's own authenticator. Pubkey auth is unaffected.
 PasswordAuthentication no
 SSHD_EOF
+    sshd_changed=true
     echo "wrote $SSHD_DROPIN"
   else
     echo "already present"
@@ -120,9 +138,12 @@ SSHD_EOF
   echo "config valid"
 fi
 
-if type -p etckeeper > /dev/null; then
+# etckeeper needs a sudo of its own, so only commit when something changed.
+if ($pam_changed || $sshd_changed) && type -p etckeeper > /dev/null; then
   sudo etckeeper commit 'fido login: enable pam_u2f via pam-auth-update' &> /dev/null || true
 fi
+
+$pam_changed || exit 0
 
 cat <<'DONE'
 
