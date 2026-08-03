@@ -56,7 +56,33 @@ self-tests with `pamtester` before it touches PAM.
 | Command | What it does |
 |---|---|
 | `enroll-fido-key` | Register one attached YubiKey against the pinned origin, append it to `~/.config/Yubico/u2f_keys`, and sync the mapping to passage. Refuses to run with two keys attached, with a key that has no FIDO PIN, or if the credential comes back without `+pin`. Run once per key. |
-| `setup-fido-login` | Idempotent. Installs the `pam-auth-update` profile and enables it, then asserts the profile reached `common-auth` and that `pam_u2f` appears nowhere else. Self-tests with `pamtester` first and aborts before changing PAM if that fails. Exits early — no touch, no PIN, no sudo — when the installed profile and `common-auth` already match what it would write; any drift (a changed `FIDO_ORIGIN`, new module options, a removed profile) triggers the full re-run. Called from `bootstrap-dotfiles`; a no-op until a key is enrolled. |
+| `setup-fido-login` | Idempotent. Orders `u2f_keys` so the attached key's credential is first (see *Credential order* below), then installs the `pam-auth-update` profile and enables it, then asserts the profile reached `common-auth` and that `pam_u2f` appears nowhere else. Self-tests with `pamtester` first and aborts before changing PAM if that fails. Exits early — no touch, no PIN, no sudo — when the installed profile and `common-auth` already match what it would write; any drift (a changed `FIDO_ORIGIN`, new module options, a removed profile) triggers the full re-run. Called from `bootstrap-dotfiles`; a no-op until a key is enrolled. |
+
+### Credential order
+
+`pam_u2f` tries the credentials on the `sandman:` line **one full assertion at
+a time, in file order** — it does not offer them all in a single assertion.
+Normally that costs nothing: a check-only probe silently works out which
+credential the attached key holds, and only that one gets a real assertion.
+`nodetect` turns that probe off, so the module falls back to trying each
+credential blind, and learns of a mismatch only *after* cueing a touch and
+collecting a PIN. With every key in one shared mapping, the host holding the
+second-listed credential pays a doomed touch+PIN before the real one:
+
+```
+cred 1 ──► cue + PIN ──► FIDO_ERR_NO_CREDENTIALS
+cred 2 ──► cue + PIN ──► success
+```
+
+`setup-fido-login` runs that probe itself (`fido2-assert -G -t up=false`, which
+needs no user presence and no PIN) and rewrites the local `u2f_keys` with the
+attached key's credential first. Ordering is **local state only** — the copy in
+passage stays canonical, and every host orders its own after `restore-secrets`.
+Both keys still authenticate on both hosts; only the non-local one pays the
+extra prompt.
+
+Setting `uv=false` on the probe as well looks natural and is wrong: a YubiKey 5
+rejects it with `FIDO_ERR_UNSUPPORTED_OPTION`. Leave `uv` alone.
 
 ### New machine
 
@@ -75,7 +101,7 @@ also needs an age identity for passage — see the Recovery drive's README.
 
 - `.local/bin/enroll-fido-key`, `.local/bin/setup-fido-login`
 - `.local/etc/fido-login.env` — pinned `FIDO_ORIGIN` / `FIDO_APPID`, shared by both scripts
-- `~/.config/Yubico/u2f_keys` — credential mapping, one line, one credential per key. Gitignored; lives in passage as `yubico/u2f_keys`
+- `~/.config/Yubico/u2f_keys` — credential mapping, one line, one credential per key, attached key's credential first. Gitignored; lives in passage as `yubico/u2f_keys`, unordered
 - `/usr/share/pam-configs/n8-u2f` — the profile, installed by `setup-fido-login`
 - `/etc/pam.d/n8-u2f-selftest` — service used by `pamtester`; nothing else reads it
 - `/etc/ssh/sshd_config.d/10-no-password-auth.conf` — see below
@@ -96,6 +122,11 @@ also needs an age identity for passage — see the Recovery drive's README.
   real assertion, whose PIN prompt gives the key the seconds it needs. The
   trade-off: an attached FIDO device with no enrolled credential now draws a
   touch cue that cannot succeed before the password prompt appears.
+- **A second enrolled key costs a prompt if it sorts first.** `nodetect` means
+  order in `u2f_keys` decides how many touch+PIN rounds you pay. Symptom:
+  authenticating twice in a row on one host and once on another, with an
+  identical mapping and PAM stack. `setup-fido-login` fixes the order — see
+  *Credential order* above.
 - **Escape restarts a stalled unlock.** If the lock screen ever lands on the
   password field instead of the PIN prompt, pressing Escape and interacting
   again starts a fresh PAM conversation, giving `pam_u2f` another shot at the

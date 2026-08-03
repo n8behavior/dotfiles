@@ -40,6 +40,93 @@ if [[ ! -s $AUTHFILE ]] || ! grep -q "^${USER}:" "$AUTHFILE"; then
   exit 0
 fi
 
+# Needed before the ordering probe below, so this runs on every pass rather
+# than only when PAM has drifted. dpkg -s needs no privileges; the sudo only
+# happens when something is actually missing.
+step 'INSTALLING: pam-u2f tooling'
+missing=()
+for pkg in libpam-u2f pamu2fcfg pamtester fido2-tools; do
+  dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
+done
+if (( ${#missing[@]} )); then
+  sudo apt install -y "${missing[@]}"
+else
+  echo "already present"
+fi
+
+# nodetect (see PAM_ARGS) turns off the probe pam_u2f uses to work out which
+# configured credential the attached key actually holds. Without it the module
+# falls back to trying them in file order with a *full* assertion each -- cue,
+# touch, PIN -- and only learns of the mismatch after the PIN has been typed.
+# Every key shares one mapping, so the host holding the second-listed
+# credential pays a doomed touch+PIN before the real one.
+#
+# So run the probe here instead and float this host's credential to the front.
+# Check-only means no user presence and no PIN: nothing to interact with, and
+# a key too sleepy to answer just leaves the order alone. The mapping in
+# passage stays canonical; only the local copy is ordered.
+step 'ORDERING: credentials for the attached key'
+order_credentials() {
+  local line rest cred handle dev hit cdh
+  local -a creds devs matched=() others=()
+
+  line=$(grep "^${USER}:" "$AUTHFILE")
+  rest=${line#"${USER}:"}
+  IFS=: read -ra creds <<< "$rest"
+  if (( ${#creds[@]} < 2 )); then
+    echo "only one credential enrolled; nothing to order"
+    return 0
+  fi
+
+  mapfile -t devs < <(fido2-token -L 2> /dev/null | cut -d: -f1)
+  if (( ${#devs[@]} == 0 )); then
+    echo "no FIDO authenticator attached; leaving order unchanged"
+    return 0
+  fi
+
+  # Any 32 bytes will do; the assertion itself is thrown away.
+  cdh=$(printf 'n8-u2f-order-probe' | openssl dgst -sha256 -binary | base64 -w0)
+
+  for cred in "${creds[@]}"; do
+    handle=${cred%%,*}
+    hit=false
+    for dev in "${devs[@]}"; do
+      # up=false is the whole probe: it asks the authenticator to answer
+      # without user presence, which succeeds only for a credential it holds
+      # and fails FIDO_ERR_NO_CREDENTIALS otherwise. Setting uv=false as well
+      # is rejected outright by a YubiKey 5 (FIDO_ERR_UNSUPPORTED_OPTION), so
+      # leave uv alone; pin=false keeps fido2-assert from ever prompting.
+      if printf '%s\n%s\n%s\n' "$cdh" "$FIDO_ORIGIN" "$handle" \
+        | fido2-assert -G -t up=false -t pin=false "$dev" &> /dev/null; then
+        hit=true
+        break
+      fi
+    done
+    if $hit; then matched+=("$cred"); else others+=("$cred"); fi
+  done
+
+  if (( ${#matched[@]} == 0 )); then
+    echo "attached key matches no enrolled credential; leaving order unchanged"
+    return 0
+  fi
+
+  local reordered tmp
+  reordered=$(IFS=:; echo "${USER}:${matched[*]}${others[*]:+:${others[*]}}")
+
+  if [[ $reordered == "$line" ]]; then
+    echo "this host's key is already first"
+    return 0
+  fi
+
+  tmp=$(mktemp)
+  awk -v u="$USER" -v r="$reordered" -F: '$1 == u { print r; next } { print }' \
+    "$AUTHFILE" > "$tmp"
+  install -m 600 "$tmp" "$AUTHFILE"
+  rm -f "$tmp"
+  echo "moved this host's credential to the front of $AUTHFILE"
+}
+order_credentials
+
 # The profile content doubles as the idempotency check below: the installed
 # copy must be byte-identical and common-auth must carry the same module line.
 PROFILE_CONTENT="Name: FIDO2 authentication (n8behavior)
@@ -62,17 +149,6 @@ if [[ -f $PROFILE ]] \
   echo "SKIPPING: fido login (common-auth already matches this configuration)"
 else
   pam_changed=true
-
-  step 'INSTALLING: pam-u2f tooling'
-  missing=()
-  for pkg in libpam-u2f pamu2fcfg pamtester; do
-    dpkg -s "$pkg" &> /dev/null || missing+=("$pkg")
-  done
-  if (( ${#missing[@]} )); then
-    sudo apt install -y "${missing[@]}"
-  else
-    echo "already present"
-  fi
 
   # Self-test before touching the real auth stack. The mapping file records key
   # handles but not the origin they were registered against, so a mismatched
