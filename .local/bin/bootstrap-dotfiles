@@ -189,7 +189,11 @@ install-yubikey-manager() {
   echo 'INSTALLING: Yubikey Mangager'
   type -p add-apt-repository || install-common-packages
   sudo add-apt-repository --yes ppa:yubico/stable
-  sudo apt install -y yubikey-manager
+  # fido2-tools gives setup-fido-login the fido2-assert probe it uses to order
+  # u2f_keys for the attached key. It runs later in this script, and installs
+  # the package itself when run standalone; pulling it in here means the PPA
+  # build rather than the older one in universe.
+  sudo apt install -y yubikey-manager fido2-tools
 }
 
 setup-rust() {
