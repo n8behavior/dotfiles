@@ -186,7 +186,7 @@ LAZYVIM_JSON
 }
 
 install-yubikey-manager() {
-  echo 'INSTALLING: Yubikey Mangager'
+  echo 'INSTALLING: YubiKey Manager'
   type -p add-apt-repository || install-common-packages
   sudo add-apt-repository --yes ppa:yubico/stable
   # fido2-tools gives setup-fido-login the fido2-assert probe it uses to order

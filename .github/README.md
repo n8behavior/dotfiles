@@ -23,7 +23,7 @@ git restore .
 ## Maintain current environment
 
 All paths in the `worktree` are ignored by default and must be explicitly
-added in the `.gitigore`.
+added in the `.gitignore`.
 
 ## YubiKey login (FIDO2 / pam-u2f)
 
