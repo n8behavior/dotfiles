@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# reboot-to-windows — reboot straight into Windows, once, without touching the
+# default boot order. Uses the UEFI BootNext variable rather than grub-reboot
+# (which would need GRUB_DEFAULT=saved): the firmware boots the Windows Boot
+# Manager on the next start only, then falls back to the normal order — so
+# Linux stays the default even if Windows restarts itself mid-update.
+#
+# Self-detecting: finds the "Windows Boot Manager" EFI entry at runtime and
+# exits cleanly on machines without one, so it's safe to ship via dotfiles.
+#
+# Usage: reboot-to-windows   (re-execs itself with sudo if not root)
+set -euo pipefail
+
+log() { printf '\033[1;34m[reboot-to-windows]\033[0m %s\n' "$*"; }
+
+if [ "$(id -u)" -ne 0 ]; then exec sudo "$0" "$@"; fi
+
+entry=$(efibootmgr | grep -i 'Windows Boot Manager' | head -1 | sed -E 's/^Boot([0-9A-Fa-f]{4}).*/\1/')
+if [ -z "$entry" ]; then
+  log "no Windows Boot Manager EFI entry on this machine — nothing to do"
+  exit 0
+fi
+
+log "next boot: Windows Boot Manager (Boot$entry)"
+efibootmgr --bootnext "$entry" >/dev/null
+
+log "rebooting in 3s — Ctrl-C to cancel (BootNext stays set until next boot)"
+sleep 3
+systemctl reboot
