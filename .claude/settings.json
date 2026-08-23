@@ -35,6 +35,5 @@
         "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
       ]
     }
-  },
-  "model": "claude-fable-5[1m]"
+  }
 }
