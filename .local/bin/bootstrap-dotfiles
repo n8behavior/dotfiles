@@ -107,6 +107,18 @@ restore-secrets() {
     echo "SKIPPING: FIDO2 PAM mapping (not yet in passage)"
   fi
 
+  # UniFi Network API key read by the unifi-mcp launcher. Absent until it is
+  # added with `passage insert unifi/api-key`, so probe the ciphertext rather
+  # than decrypting, as with the FIDO2 mapping above.
+  if [[ -f "$HOME/.passage/store/unifi/api-key.age" ]]; then
+    echo "Restoring UniFi API key (touch YubiKey when prompted)..."
+    mkdir -p ~/.local/etc
+    passage show unifi/api-key > ~/.local/etc/unifi-api-key
+    chmod 600 ~/.local/etc/unifi-api-key
+  else
+    echo "SKIPPING: UniFi API key (not yet in passage)"
+  fi
+
   echo "Secrets restored successfully!"
 }
 
@@ -232,6 +244,16 @@ install-golang() {
   sudo tar -C /usr/local -xzf "$tmp/go.tar.gz"
   rm -rf "$tmp"
   /usr/local/go/bin/go version
+}
+
+install-go-unifi-mcp() {
+  echo 'INSTALLING: go-unifi-mcp (UniFi Network MCP server)'
+  [[ -x /usr/local/go/bin/go ]] || install-golang
+  # GOBIN lands the binary on the PATH exported above; the Go default of
+  # ~/go/bin is not on it, which is what the unifi-mcp launcher expects.
+  GOBIN="$HOME/.local/bin" /usr/local/go/bin/go install \
+    github.com/claytono/go-unifi-mcp/cmd/go-unifi-mcp@latest
+  "$HOME/.local/bin/go-unifi-mcp" -version
 }
 
 install-claude-code() {
@@ -380,6 +402,7 @@ install-atuin
 install-nvm
 install-fzf
 install-golang
+install-go-unifi-mcp
 setup-editor
 install-lazyvim
 setup-terminal

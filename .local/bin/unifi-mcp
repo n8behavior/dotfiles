@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# stdio MCP server for the UniFi Network Controller: loads config and the
+# passage-derived API key, then hands off to go-unifi-mcp.
+#
+# Claude Code launches this non-interactively, so the key is read from a file
+# restored at bootstrap rather than shelled out to `passage show`. A live
+# decrypt would need a YubiKey touch whose prompt has nowhere to appear, and
+# the server would just hang until the client's 30s connect timeout.
+
+set -euo pipefail
+
+CONFIG="$HOME/.local/etc/unifi.env"
+KEY_FILE="$HOME/.local/etc/unifi-api-key"
+
+if [[ ! -r $CONFIG ]]; then
+  echo "unifi-mcp: missing config $CONFIG" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+. "$CONFIG"
+
+if [[ ! -r $KEY_FILE ]]; then
+  echo "unifi-mcp: missing API key $KEY_FILE" >&2
+  echo "unifi-mcp: run bootstrap-dotfiles, or restore it directly with:" >&2
+  echo "  passage show unifi/api-key > $KEY_FILE && chmod 600 $KEY_FILE" >&2
+  exit 1
+fi
+
+# $(<...) strips the trailing newline that passage leaves on the decrypted key.
+UNIFI_API_KEY=$(<"$KEY_FILE")
+export UNIFI_HOST UNIFI_SITE UNIFI_VERIFY_SSL UNIFI_API_KEY
+
+# Prefer the bootstrap-installed copy; the MCP client's PATH is not ours.
+BIN="$HOME/.local/bin/go-unifi-mcp"
+if [[ ! -x $BIN ]]; then
+  BIN=$(command -v go-unifi-mcp) || {
+    echo "unifi-mcp: go-unifi-mcp not found; run bootstrap-dotfiles" >&2
+    exit 1
+  }
+fi
+
+exec "$BIN" "$@"
