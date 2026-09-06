@@ -48,6 +48,7 @@
 !.local/bin/wifi-reset
 !.local/etc/
 !.local/etc/fido-login.env
+!.local/etc/modem.env
 !.local/etc/settings.json
 !.local/etc/unifi.env
 !.profile

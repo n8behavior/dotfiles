@@ -119,6 +119,18 @@ restore-secrets() {
     echo "SKIPPING: UniFi API key (not yet in passage)"
   fi
 
+  # Sagemcom cable modem admin login, read by the DOCSIS stats collector. One
+  # multiline entry so a single touch yields both fields: password on line 1,
+  # `username:` on line 2.
+  if [[ -f "$HOME/.passage/store/modem/admin.age" ]]; then
+    echo "Restoring modem admin credentials (touch YubiKey when prompted)..."
+    mkdir -p ~/.local/etc
+    passage show modem/admin > ~/.local/etc/modem-admin
+    chmod 600 ~/.local/etc/modem-admin
+  else
+    echo "SKIPPING: modem admin credentials (not yet in passage)"
+  fi
+
   echo "Secrets restored successfully!"
 }
 
