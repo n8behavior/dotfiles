@@ -272,6 +272,20 @@ install-claude-code() {
   fi
 }
 
+setup-unifi-mcp() {
+  echo 'REGISTERING: unifi MCP server with Claude Code'
+  type -p claude || install-claude-code
+  # `claude mcp get` exits 0 when the server is registered, even if it cannot
+  # connect yet (no key file), and 1 when it is not.
+  if claude mcp get unifi > /dev/null 2>&1; then
+    echo "unifi MCP server already registered"
+    return 0
+  fi
+  # User scope lands it in ~/.claude.json for every project. The launcher is
+  # registered by absolute path: the MCP client's PATH is not ours.
+  claude mcp add --scope user unifi -- "$HOME/.local/bin/unifi-mcp"
+}
+
 setup-gnome-terminal-gruvbox() {
   type -p dconf || return 0
 
@@ -407,6 +421,7 @@ setup-editor
 install-lazyvim
 setup-terminal
 install-claude-code
+setup-unifi-mcp
 cargo install aichat
 
 # No-ops until a key is enrolled with enroll-fido-key

@@ -25,6 +25,12 @@ git restore .
 All paths in the `worktree` are ignored by default and must be explicitly
 added in the `.gitignore`.
 
+After pushing, refresh the backup clone on the Recovery drive:
+
+```
+git -C /media/sandman/Recovery/dotfiles pull --ff-only
+```
+
 ## YubiKey login (FIDO2 / pam-u2f)
 
 Touch + PIN replaces the password at the GDM greeter, the lock screen, `sudo`,
@@ -197,6 +203,98 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 
 - `sassc` (apt) — needed to compile Gruvbox-GTK-Theme. Included in `install-common-packages`.
 - `f-person/auto-dark-mode.nvim` — pulled in by LazyVim; run `:Lazy sync` after first update.
+
+## UniFi Network MCP
+
+Claude Code talks to the UDM SE's Network controller through
+[go-unifi-mcp](https://github.com/claytono/go-unifi-mcp), a stdio MCP server.
+It is registered at user scope, so every project sees it.
+
+```
+claude ──► unifi-mcp ──────────────► go-unifi-mcp ──► https://192.168.1.1
+           │ sources .local/etc/unifi.env              (Network API, self-signed)
+           └ reads   ~/.local/etc/unifi-api-key
+```
+
+### Why a launcher
+
+`~/.claude.json` registers a server by command line, so a key placed there
+would sit in plaintext next to every other project setting. The `unifi-mcp`
+launcher keeps it out: it sources the non-secret config, reads the key from a
+`0600` file, and execs `go-unifi-mcp` with both in the environment.
+
+The launcher reads a file rather than calling `passage show` because Claude
+Code starts the server non-interactively. The YubiKey touch prompt would have
+nowhere to appear, and the server would hang until the client's 30s connect
+timeout.
+
+### The key
+
+`go-unifi-mcp` talks to the local controller, so it needs a **Network API key**
+from the console's Control Plane — not a Site Manager key from unifi.ui.com,
+which is for the cloud API. It lives in passage as `unifi/api-key`; the
+Recovery drive's README lists it with the other secrets.
+
+To rotate it: create a new key in the controller, then
+
+```
+passage insert -f unifi/api-key
+/media/sandman/Recovery/sync-secrets push
+```
+
+and re-run the restore command below on each machine.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `unifi-mcp` | The launcher. Run it directly to see why a server fails to connect: it reports a missing config, key file, or binary on stderr and exits 1. |
+| `claude mcp get unifi` | Show the registration and whether Claude Code can connect. |
+| `passage show unifi/api-key > ~/.local/etc/unifi-api-key && chmod 600 ~/.local/etc/unifi-api-key` | Restore the key. `restore-secrets` in `bootstrap-dotfiles` does this on a fresh machine. |
+| `claude mcp add --scope user unifi -- ~/.local/bin/unifi-mcp` | Register the server. `setup-unifi-mcp` in `bootstrap-dotfiles` does this on a fresh machine and is a no-op if it already exists. |
+
+### New machine
+
+`bootstrap-dotfiles` does all of it: `install-go-unifi-mcp` builds the binary
+into `~/.local/bin`, `restore-secrets` writes the key file from passage, and
+`setup-unifi-mcp` registers the launcher.
+
+### Existing machine
+
+After `git pull` on a machine that predates this section:
+
+```
+/media/sandman/Recovery/sync-secrets pull
+GOBIN=~/.local/bin go install github.com/claytono/go-unifi-mcp/cmd/go-unifi-mcp@latest
+passage show unifi/api-key > ~/.local/etc/unifi-api-key && chmod 600 ~/.local/etc/unifi-api-key
+claude mcp add --scope user unifi -- ~/.local/bin/unifi-mcp
+claude mcp get unifi
+```
+
+### Files
+
+- `.local/bin/unifi-mcp` — the launcher
+- `.local/etc/unifi.env` — `UNIFI_HOST`, `UNIFI_SITE`, `UNIFI_VERIFY_SSL`; no secrets
+- `~/.local/etc/unifi-api-key` — the key, `0600`. Gitignored; lives in passage as `unifi/api-key`
+- `~/.local/bin/go-unifi-mcp` — installed with `GOBIN` pointed at `~/.local/bin`, since Go's default `~/go/bin` is not on `PATH`
+- `~/.claude.json` — holds the registration, written by `claude mcp add`
+
+### Gotchas
+
+- **Restore the key from a real terminal, not from inside a Claude session.**
+  A `passage show` run by Claude Code's shell tool has no tty for the touch
+  prompt, so the plugin's touch wait expires and `rage` reports
+  `Failed to decrypt YubiKey stanza`. Nothing is wrong with the key or the
+  ciphertext.
+- **`Failed to connect` from `claude mcp get unifi` usually means no key
+  file.** Run `~/.local/bin/unifi-mcp` by hand; the launcher says exactly what
+  is missing.
+- **Certificate verification is off.** The UDM SE serves a self-signed
+  certificate (`CN=unifi.local`) that also mismatches the IP we connect on.
+  This is a link-local hop to the gateway, not traffic crossing an untrusted
+  network.
+- **PIV is unreachable over SSH**, so the restore command has to run at the
+  machine. See the YubiKey login gotchas above.
 
 ## WSL2 Setup
 
