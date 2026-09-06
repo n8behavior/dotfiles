@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+#
+# Query the Sagemcom FAST3896S XMO API with nothing but curl and sha512sum.
+#
+#   modem-api <xpath> [<xpath> ...]
+#
+# Auth, recovered from the console's gui-api.js and confirmed against both a
+# captured session and a live browser cookie:
+#
+#   pwHash  = sha512(password)                       # GUI_PASSWORD_SALT is ""
+#   ha1     = sha512(user : nonce : pwHash)          # nonce empty until login replies
+#   authKey = sha512(ha1 : reqId : cnonce : JSON : /cgi/json-req)
+#
+# Hard-won rules about this device:
+#   - request ids MUST be sequential within a session; a gap gets
+#     XMO_REQUEST_ID_ERR
+#   - sessions are a scarce resource. persistent:false plus an EXIT trap that
+#     calls logOut, or orphans pile up and lock everyone out until they age
+#     out (SessionTimeout is 5 minutes)
+#   - the httpd refuses new connections when hit too fast; curl exit 7 means
+#     back off, not retry harder
+#   - batch every xpath into ONE request rather than one request per path
+
+set -euo pipefail
+
+CONF="$HOME/.local/etc/modem.env"
+CREDS="$HOME/.local/etc/modem-admin"
+[[ -r $CONF ]] || { echo "missing $CONF" >&2; exit 1; }
+[[ -r $CREDS ]] || { echo "missing $CREDS -- run: passage show modem/admin > $CREDS" >&2; exit 1; }
+# shellcheck source=/dev/null
+. "$CONF"
+
+USER_NAME="${MODEM_USER:-admin}"
+HOST="${MODEM_HOST:-https://192.168.100.1}"
+URI="/cgi/json-req"
+PASSWORD=$(head -1 "$CREDS")
+SETTLE="${MODEM_SETTLE:-3}"   # seconds between connections; 3 measured safe
+
+(( $# )) || { echo "usage: $(basename "$0") <xpath> [<xpath> ...]" >&2; exit 1; }
+
+sha512() { printf '%s' "$1" | sha512sum | cut -d' ' -f1; }
+rand()   { printf '%s' $(( (RANDOM << 16) | RANDOM )); }
+
+PW_HASH=$(sha512 "$PASSWORD")
+NONCE=""          # empty until logIn replies
+SESSION="0"
+REQ_ID=0          # must advance by exactly one per request
+
+auth_key() { # $1=reqId $2=cnonce
+  local ha1
+  ha1=$(sha512 "${USER_NAME}:${NONCE}:${PW_HASH}")
+  sha512 "${ha1}:${1}:${2}:JSON:${URI}"
+}
+
+# Back off rather than hammer: exit 7 means the httpd is refusing connections.
+post() {
+  local body=$1 out rc delay=$SETTLE
+  for attempt in 1 2 3; do
+    out=$(curl -sk -m 20 -X POST --data-urlencode "req=$body" "${HOST}${URI}") && rc=0 || rc=$?
+    if (( rc == 0 )); then printf '%s' "$out"; return 0; fi
+    (( attempt < 3 )) && { echo "  (connection refused, backing off ${delay}s)" >&2; sleep "$delay"; delay=$(( delay * 2 )); }
+  done
+  echo "modem refused connections after 3 attempts" >&2
+  return 1
+}
+
+send() { # $1=json actions array -> prints reply
+  local cn ak req
+  cn=$(rand); ak=$(auth_key "$REQ_ID" "$cn")
+  req=$(jq -cn --argjson actions "$1" --argjson id "$REQ_ID" --arg sid "$SESSION" \
+    --argjson cn "$cn" --arg ak "$ak" \
+    '{request: {id: $id, "session-id": ($sid|tonumber? // $sid), priority: false,
+                actions: $actions, cnonce: $cn, "auth-key": $ak}}')
+  post "$req"
+}
+
+# send() runs inside $( ), a subshell, so it cannot advance REQ_ID itself --
+# the caller must, or every request goes out as id 0 and the modem answers
+# XMO_REQUEST_ID_ERR.
+bump() { REQ_ID=$(( REQ_ID + 1 )); }
+
+# --- session lifecycle -----------------------------------------------------
+LOGGED_IN=0
+cleanup() {
+  (( LOGGED_IN )) || return 0
+  LOGGED_IN=0
+  sleep "$SETTLE"
+  send '[{"id":0,"method":"logOut","parameters":{}}]' >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+LOGIN_ACTIONS=$(jq -cn --arg u "$USER_NAME" '[{
+  id: 0, method: "logIn",
+  parameters: {
+    user: $u, persistent: "false",
+    "session-options": {
+      nss: [{name: "gtw", uri: "http://sagemcom.com/gateway-data"}],
+      "context-flags": {"get-content-name": true, "local-time": true},
+      "capability-depth": 2,
+      "capability-flags": {name: true, "default-value": false, restriction: true, description: false},
+      "time-format": "ISO_8601",
+      "write-only-string": "_XMO_WRITE_ONLY_",
+      "undefined-write-only-string": "_XMO_UNDEFINED_WRITE_ONLY_"
+    }}}]')
+
+REPLY=$(send "$LOGIN_ACTIONS"); bump
+SESSION=$(jq -r '.reply.actions[0].callbacks[0].parameters.id // empty' <<<"$REPLY")
+NONCE=$(jq -r '.reply.actions[0].callbacks[0].parameters.nonce // empty' <<<"$REPLY")
+[[ -n $SESSION && -n $NONCE ]] || {
+  echo "login failed: $(jq -c '.reply.error // .' <<<"$REPLY" 2>/dev/null || printf '%s' "$REPLY")" >&2
+  exit 1
+}
+LOGGED_IN=1
+
+# --- one batched read ------------------------------------------------------
+sleep "$SETTLE"
+ACTIONS=$(printf '%s\n' "$@" | jq -R . | jq -s 'to_entries | map({
+  id: .key, method: "getValue", xpath: .value,
+  options: {"capability-flags": {interface: true}}})')
+
+RESULT=$(send "$ACTIONS"); bump
+if [[ -n ${MODEM_DEBUG:-} ]]; then
+  printf '%s\n' "$RESULT" | jq . >&2
+fi
+# Actions that error come back with an empty callbacks[] and no xpath, so pair
+# them back to the requested paths by action id -- otherwise a bad path just
+# disappears and looks like an empty result.
+PATHS=$(printf '%s\n' "$@" | jq -R . | jq -s .)
+printf '%s' "$RESULT" | jq --argjson paths "$PATHS" '[
+  .reply.actions[] | {
+    xpath: $paths[.id],
+    error: (if (.error.description // "") | test("NO_ERR") then null else .error.description end),
+    value: (.callbacks[0]?.parameters.value)
+  }]'

@@ -41,6 +41,7 @@
 !.local/bin/start-issue
 !.local/bin/close-issue
 !.local/bin/markdownlint-cli2
+!.local/bin/modem-api
 !.local/bin/theme-sync
 !.local/bin/theme-sync-install
 !.local/bin/theme-toggle
