@@ -52,13 +52,16 @@ auth_key() { # $1=reqId $2=cnonce
   sha512 "${ha1}:${1}:${2}:JSON:${URI}"
 }
 
-# Back off rather than hammer: exit 7 means the httpd is refusing connections.
+# Back off rather than hammer when the modem stops answering.
 post() {
-  local body=$1 out rc delay=$SETTLE
+  local body=$1 out rc why delay=$SETTLE
   for attempt in 1 2 3; do
     out=$(curl -sk -m 20 -X POST --data-urlencode "req=$body" "${HOST}${URI}") && rc=0 || rc=$?
     if (( rc == 0 )); then printf '%s' "$out"; return 0; fi
-    (( attempt < 3 )) && { echo "  (connection refused, backing off ${delay}s)" >&2; sleep "$delay"; delay=$(( delay * 2 )); }
+    # curl 7 = refused (httpd rejecting), 28 = timed out (listening but wedged,
+    # or nothing there). They mean different things -- do not conflate them.
+    case $rc in 7) why="connection refused" ;; 28) why="timed out" ;; *) why="curl exit $rc" ;; esac
+    (( attempt < 3 )) && { echo "  ($why, backing off ${delay}s)" >&2; sleep "$delay"; delay=$(( delay * 2 )); }
   done
   echo "modem refused connections after 3 attempts" >&2
   return 1
