@@ -53,17 +53,40 @@ st() {
 # Anything outside ~/src, or with an explicit owner/repo, is passed through
 # to the real gh untouched.
 gh() {
-	local rel="${PWD#"$HOME"/src/}" org="" repo=""
+	local rel="${PWD#"$HOME"/src/}" org="" repo="" gittop="" url=""
 	if [[ "$PWD" == "$HOME"/src/* && "$rel" != "$PWD" ]]; then
 		org="${rel%%/*}"
 		local rest="${rel#*/}"
-		[[ "$rest" != "$rel" ]] && repo="${rest%%/*}"
+		# Grouping dirs (~/src/<owner>/<group>/<repo>) nest repos deeper
+		# than <owner>/<repo>; the deepest segment is the best path-derived
+		# guess for the repo name at any depth.
+		[[ "$rest" != "$rel" ]] && repo="${rest##*/}"
+		# A work tree under ~/src knows better than the path: take
+		# owner/repo from its origin remote, or its toplevel basename if
+		# it has no remote. The dotfiles repo at $HOME encloses every
+		# non-repo dir and must not hijack resolution, so it doesn't count.
+		if gittop="$(git rev-parse --show-toplevel 2>/dev/null)" &&
+			[[ "$gittop" == "$HOME"/src/* ]]; then
+			if url="$(git remote get-url origin 2>/dev/null)" && [[ -n "$url" ]]; then
+				url="${url%/}" url="${url%.git}"
+				repo="${url##*/}"
+				url="${url%/*}"
+				org="${url##*[:/]}"
+			else
+				url=""
+				repo="${gittop##*/}"
+			fi
+		else
+			gittop=""
+		fi
 	fi
 
 	# Directory-derived default repo (OWNER/REPO) for repo-scoped commands,
-	# unless the caller already set GH_REPO or passed -R/--repo.
+	# unless the caller already set GH_REPO or passed -R/--repo — or the
+	# work tree has an origin remote, which gh resolves by itself and
+	# GH_REPO would needlessly override.
 	local ghrepo=""
-	if [[ -n "$repo" && -z "$GH_REPO" ]]; then
+	if [[ -n "$repo" && -z "$url" && -z "$GH_REPO" ]]; then
 		case " $* " in
 			*" -R "*|*" --repo "*|*" -R="*|*" --repo="*) ;;
 			*) ghrepo="$org/$repo" ;;
