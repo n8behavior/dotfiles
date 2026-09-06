@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Snapshot the modem's entire TR-181 data model and index it for grepping.
+#
+#   modem-dump [outdir]     # default: ~/.cache/modem-dump
+#
+# One getValue on the "Device" root returns the whole tree (~490KB, ~13s), so
+# this is a single request on a single session -- no walking, no per-node
+# reads, nothing to rate-limit us out of.
+#
+# Produces:
+#   device.json  raw reply, timestamped
+#   leaves.txt   every leaf as "Device/a/b/c = value", one per line
+#
+# The snapshot is point-in-time: re-run it after changing anything in the
+# web console, or readings will be stale.
+
+set -euo pipefail
+OUT="${1:-$HOME/.cache/modem-dump}"
+mkdir -p "$OUT"
+
+echo "querying modem (one batched read of the Device root)..." >&2
+modem-api Device > "$OUT/device.json"
+
+# paths() must run with the subtree as `.`, not merely bound to a variable,
+# or the emitted paths are rooted at the reply array and getpath fails.
+jq -r '
+  .[0].value.Device
+  | . as $d
+  | paths(scalars) as $p
+  | select($p | index("capability") | not)
+  | "Device/" + ($p | map(tostring) | join("/")) + " = " + ($d | getpath($p) | tostring)
+' "$OUT/device.json" > "$OUT/leaves.txt"
+
+date -Is > "$OUT/taken-at"
+printf 'snapshot: %s\n  device.json  %s\n  leaves.txt   %s leaves\n  taken-at     %s\n' \
+  "$OUT" "$(du -h "$OUT/device.json" | cut -f1)" "$(wc -l < "$OUT/leaves.txt")" "$(cat "$OUT/taken-at")" >&2
