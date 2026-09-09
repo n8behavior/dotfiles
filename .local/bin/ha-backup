@@ -9,8 +9,8 @@
 # What it captures:
 #   /homeassistant   .storage (entity/device/area registries, dashboards,
 #                    integration config entries), the YAML, blueprints, .git
-#   /addon_configs   add-on settings, including the SSH add-on's
-#                    authorized_keys — without which a bare-metal restore
+#   ha-addon-config  the SSH add-on's own options.json (authorized_keys) and
+#                    host keys, staged from /data. /addon_configs is empty on
 #                    locks you out of the box you are restoring
 #
 # What it skips, deliberately:
@@ -110,15 +110,28 @@ do_backup() {
   [ -e "$out" ] && die "$out already exists — refusing to overwrite a snapshot"
 
   log "pulling from $HA_HOST"
-  ssh -o BatchMode=yes -o ConnectTimeout=10 -i "$HA_KEY" "$HA_HOST" \
-    'tar -czf - -C / \
+  # /addon_configs is EMPTY on this install. The SSH add-on keeps its real
+  # config — including authorized_keys — at /data/options.json inside the add-on
+  # container. Stage that under a clean path so it actually lands in the archive;
+  # /addon_configs is still included in case an add-on later starts using it.
+  # Other add-ons' data is supervisor-managed and unreachable from here, so this
+  # covers the lock-yourself-out case and not much else. See the README.
+  ssh -o BatchMode=yes -o ConnectTimeout=10 -i "$HA_KEY" "$HA_HOST" '
+    rm -rf /ha-addon-config
+    mkdir -p /ha-addon-config/ssh
+    cp /data/options.json /ha-addon-config/ssh/options.json 2>/dev/null || true
+    cp -r /data/host_keys /ha-addon-config/ssh/ 2>/dev/null || true
+    tar -czf - -C / \
        --exclude="homeassistant/home-assistant_v2.db*" \
        --exclude="homeassistant/.cache" \
        --exclude="homeassistant/deps" \
        --exclude="homeassistant/tts" \
        --exclude="homeassistant/*.log*" \
        --exclude="homeassistant/.ha_run.lock" \
-       homeassistant addon_configs' > "$tmp/snap.tgz" \
+       homeassistant addon_configs ha-addon-config
+    rc=$?
+    rm -rf /ha-addon-config
+    exit $rc' > "$tmp/snap.tgz" \
     || die "pull failed — destination untouched"
 
   # Verify before the destination is touched at all.
@@ -131,7 +144,7 @@ do_backup() {
     grep -qxF "$m" "$tmp/members" || { printf '  missing: %s\n' "$m" >&2; missing=1; }
   done
   [ "$missing" = 0 ] || die "expected members absent — destination untouched"
-  grep -q '^addon_configs/' "$tmp/members" || die "addon_configs absent — destination untouched"
+  grep -qx 'ha-addon-config/ssh/options.json' "$tmp/members" || die "SSH add-on config absent — destination untouched"
 
   age -R "$RECIPIENTS" -o "$out" "$tmp/snap.tgz" || die "encryption failed"
 

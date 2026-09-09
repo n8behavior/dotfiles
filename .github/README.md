@@ -361,8 +361,9 @@ ha-backup --list              list snapshots with ages (>30 days flagged STALE)
 ha-backup --restore F DIR     decrypt F into DIR for inspection
 ```
 
-It pulls `/homeassistant` and `/addon_configs` over the SSH add-on, gzips, and
-encrypts with `age -R ~/.passage/store/.age-recipients` — the same two YubiKey
+It pulls `/homeassistant`, the SSH add-on's own config, and `/addon_configs`
+over the SSH add-on, gzips, and encrypts with
+`age -R ~/.passage/store/.age-recipients` — the same two YubiKey
 recipients passage uses. **Restoring needs the Recovery drive and one YubiKey,
 nothing else.** There is no separate encryption key to store, and since
 encrypting needs only public keys, creating a snapshot never prompts for a
@@ -391,17 +392,22 @@ pull --ff-only` after pushing, or the drive runs stale tooling.
 - **Built to a temp file and verified before the destination is touched.** A
   failed pull cannot destroy a good snapshot.
 - **Asserts expected members** (`core.entity_registry`, `core.device_registry`,
-  `core.area_registry`, the YAML, and `addon_configs/`) before accepting an
-  archive, so a silently-empty pull is refused rather than shipped.
+  `core.area_registry`, the YAML, and `ha-addon-config/ssh/options.json`)
+  before accepting an archive, so a silently-empty pull is refused rather than
+  shipped.
 - **Refuses fewer than `MIN_RECIPIENTS` (2) keys** and deletes the output. One
   dead YubiKey must never be able to lock the archive permanently.
 - **Refuses to overwrite** an existing snapshot; filenames are second-granular.
 
 #### Gotchas
 
-- **`/addon_configs` is included on purpose.** It holds the SSH add-on's
-  `authorized_keys`; without it a bare-metal restore locks you out of the box
-  you are restoring.
+- **The SSH add-on's config is captured, but `/addon_configs` is not where it
+  lives.** That directory is empty on this install: the add-on keeps
+  `authorized_keys` in `/data/options.json` inside its own container, so
+  `ha-backup` stages that and the host keys into `ha-addon-config/ssh/` in the
+  archive. Without it a bare-metal restore locks you out of the box you are
+  restoring. Other add-ons' data is supervisor-managed and unreachable from the
+  add-on container — HA's own backup is the tool if you need that.
 - **The Recovery drive is optional at create time.** If it is not attached the
   snapshot goes to `~/ha-backups` and the script says so — copy it across when
   you next attach the drive.
