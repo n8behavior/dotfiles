@@ -31,6 +31,7 @@
 # Usage:
 #   ha-backup                    create a snapshot
 #   ha-backup --list             list snapshots, newest first, with ages
+#   ha-backup --keep N           create a snapshot, then keep only the N newest
 #   ha-backup --restore F DIR    decrypt F into DIR for inspection
 
 set -euo pipefail
@@ -39,6 +40,7 @@ HA_HOST="${HA_HOST:-root@homeassistant.local}"
 HA_KEY="${HA_KEY:-$HOME/.ssh/id_rsa}"
 RECIPIENTS="${RECIPIENTS:-$HOME/.passage/store/.age-recipients}"
 IDENTITIES="${IDENTITIES:-$HOME/.passage/identities}"
+KEEP=0
 MIN_RECIPIENTS="${MIN_RECIPIENTS:-2}"
 RECOVERY="${RECOVERY:-/media/sandman/Recovery}"
 DEST_DIR="${DEST_DIR:-$RECOVERY/home-lab/ha-backups}"
@@ -89,6 +91,24 @@ do_restore() {
   age -d -i "$IDENTITIES" "$src" | tar -xzf - -C "$dest"
   log "extracted to $dest"
   log "review it, then copy pieces back deliberately — this does not write to HA"
+}
+
+prune_old() {
+  # Runs ONLY after the new snapshot has passed every check in do_backup, so a
+  # failed or malformed pull can never trigger deletion of good snapshots. Same
+  # rule as the rest of this script: nothing good is destroyed until something
+  # verified stands in its place.
+  local n=0 f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rm -f "$f" && { log "pruned $(basename "$f")"; n=$((n+1)); }
+  done < <(find "$DEST_DIR" -maxdepth 1 -name 'ha-config-*.tgz.age' -type f 2>/dev/null \
+           | xargs -r ls -1t 2>/dev/null | tail -n +$((KEEP + 1)))
+  if [ "$n" = 0 ]; then
+    log "retention: keeping $KEEP, nothing to prune"
+  else
+    log "retention: keeping $KEEP, pruned $n"
+  fi
 }
 
 do_backup() {
@@ -168,12 +188,18 @@ do_backup() {
   printf '  %s members, %s encrypted, decryptable by %s of your YubiKeys\n' \
     "$(wc -l < "$tmp/members")" "$(du -h "$out" | cut -f1)" \
     "$stanzas"
+
+  if [ "$KEEP" -gt 0 ]; then prune_old; fi
 }
 
 case "${1:-}" in
   --list)    do_list ;;
   --restore) [ $# -eq 3 ] || die "usage: ha-backup --restore <file.tgz.age> <dir>"
              do_restore "$2" "$3" ;;
+  --keep)    [ $# -eq 2 ] || die "usage: ha-backup --keep <N>"
+             case "$2" in *[!0-9]*|'') die "--keep needs a positive integer, got: $2" ;; esac
+             [ "$2" -ge 1 ] || die "--keep must be at least 1"
+             KEEP="$2"; do_backup ;;
   "")        do_backup ;;
-  *)         die "unknown option: $1 (see --list, --restore)" ;;
+  *)         die "unknown option: $1 (see --list, --restore, --keep)" ;;
 esac

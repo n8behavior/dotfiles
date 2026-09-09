@@ -358,6 +358,7 @@ stale when this was written. `ha-backup` covers the gap.
 ```
 ha-backup                     create a snapshot
 ha-backup --list              list snapshots with ages (>30 days flagged STALE)
+ha-backup --keep N            create a snapshot, then keep only the N newest
 ha-backup --restore F DIR     decrypt F into DIR for inspection
 ```
 
@@ -398,6 +399,9 @@ pull --ff-only` after pushing, or the drive runs stale tooling.
 - **Refuses fewer than `MIN_RECIPIENTS` (2) keys** and deletes the output. One
   dead YubiKey must never be able to lock the archive permanently.
 - **Refuses to overwrite** an existing snapshot; filenames are second-granular.
+- **Prunes only after the new snapshot passes every check.** `--keep N` runs
+  last, so a failed or malformed pull can never delete good snapshots. Without
+  `--keep`, nothing is ever deleted.
 
 #### Gotchas
 
