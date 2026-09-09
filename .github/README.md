@@ -379,10 +379,12 @@ the YAML, which is the logic. It deliberately excludes `.storage/` — the
 entity, device and area registries, dashboards and integration config entries.
 That is the part you cannot rewrite from memory, and it is what this captures.
 
-A copy is deployed to the Recovery drive root beside `sync-secrets`, because a
-real recovery starts with the drive and a YubiKey and no dotfiles. This repo
-holds the canonical version; `ha-backup` compares itself against the drive copy
-whenever the drive is attached and prints the `cp` that reconciles them.
+The Recovery drive reaches it at `/media/sandman/Recovery/ha-backup`, a relative
+symlink into the `dotfiles/` clone on that drive -- as is `sync-secrets`. A real
+recovery starts with the drive and a YubiKey and no dotfiles installed, so both
+have to be reachable from the drive; symlinking rather than copying keeps one
+version-controlled source. Refresh with `git -C /media/sandman/Recovery/dotfiles
+pull --ff-only` after pushing, or the drive runs stale tooling.
 
 #### Guarantees it enforces
 
