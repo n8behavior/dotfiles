@@ -59,19 +59,6 @@ REQUIRED=(
   homeassistant/configuration.yaml
 )
 
-check_drive_copy() {
-  # The drive copy is what a bare-metal restore actually runs, since the
-  # dotfiles are not there yet. Canonical lives in the dotfiles repo, so warn
-  # rather than silently letting the two drift apart.
-  local drive="$RECOVERY/ha-backup"
-  [ -d "$RECOVERY" ] || return 0
-  if [ ! -f "$drive" ]; then
-    log "note: no copy on the Recovery drive — cp "$0" "$drive""
-  elif ! cmp -s "$0" "$drive"; then
-    log "note: Recovery drive copy differs from this one — cp "$0" "$drive""
-  fi
-}
-
 resolve_dest() {
   # Recovery drive is attached only when needed, so fall back to a local
   # spool. Both paths are reported so a snapshot is never "lost".
@@ -80,7 +67,6 @@ resolve_dest() {
 
 do_list() {
   resolve_dest
-  check_drive_copy
   [ "$ON_DRIVE" = 1 ] || log "Recovery drive not attached — listing local spool"
   [ -d "$DEST_DIR" ] || die "no snapshots in $DEST_DIR"
   local found=0 now age
@@ -111,7 +97,6 @@ do_backup() {
   [ -r "$HA_KEY" ]     || die "missing ssh key at $HA_KEY"
 
   resolve_dest
-  check_drive_copy
   if [ "$ON_DRIVE" = 0 ]; then
     log "Recovery drive not attached — writing to $DEST_DIR (copy it over when you attach)"
   fi
