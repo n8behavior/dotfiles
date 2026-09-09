@@ -403,6 +403,11 @@ That is the part you cannot rewrite from memory, and it is what this captures.
   over 30 days.
 - **A backup you have never restored is a hope.** Do one `--restore` into a
   scratch directory and look at it.
+- **`--restore` cannot run from inside a Claude session.** Decryption needs a
+  YubiKey touch and the plugin's prompt has no tty there, so `rage` fails with
+  `Failed to decrypt YubiKey stanza` and `tar` sees an empty stream. Same
+  constraint as `passage show` above. Creating a snapshot is unaffected --
+  encryption uses public keys only. Run restores from a real terminal.
 
 ## WSL2 Setup
 
