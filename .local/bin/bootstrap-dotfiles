@@ -131,6 +131,19 @@ restore-secrets() {
     echo "SKIPPING: modem admin credentials (not yet in passage)"
   fi
 
+  # Home Assistant long-lived access token, read by ad-hoc queries against the
+  # HA REST API. Absent until it is added with `passage insert
+  # homeassistant/token`, so probe the ciphertext rather than decrypting, as
+  # with the entries above.
+  if [[ -f "$HOME/.passage/store/homeassistant/token.age" ]]; then
+    echo "Restoring Home Assistant token (touch YubiKey when prompted)..."
+    mkdir -p ~/.local/etc
+    passage show homeassistant/token > ~/.local/etc/homeassistant-token
+    chmod 600 ~/.local/etc/homeassistant-token
+  else
+    echo "SKIPPING: Home Assistant token (not yet in passage)"
+  fi
+
   echo "Secrets restored successfully!"
 }
 

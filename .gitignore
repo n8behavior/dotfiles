@@ -41,6 +41,7 @@
 !.local/bin/start-issue
 !.local/bin/close-issue
 !.local/bin/markdownlint-cli2
+!.local/bin/ha-backup
 !.local/bin/modem-api
 !.local/bin/modem-dump
 !.local/bin/theme-sync

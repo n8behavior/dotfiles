@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# ha-backup — age-encrypted snapshot of the Home Assistant configuration.
+#
+# Home Assistant's own snapshots land in /backup on the same disk they are
+# meant to protect, and automatic backups were never enabled: the only one on
+# the box was 443 days stale when this was written. This pulls the small,
+# irreplaceable half of the config and writes it to the Recovery drive.
+#
+# What it captures:
+#   /homeassistant   .storage (entity/device/area registries, dashboards,
+#                    integration config entries), the YAML, blueprints, .git
+#   /addon_configs   add-on settings, including the SSH add-on's
+#                    authorized_keys — without which a bare-metal restore
+#                    locks you out of the box you are restoring
+#
+# What it skips, deliberately:
+#   home-assistant_v2.db*  148MB of recorder history — 95% of the directory,
+#                          and tarring live SQLite with an active -wal yields a
+#                          torn copy. Restoring without it gives a working
+#                          system with every device intact and no graphs.
+#   .cache deps tts *.log* runtime noise, all regenerated
+#
+# There is no separate encryption key to store. `age -R .age-recipients`
+# encrypts to the YubiKey PIV recipients passage already uses, so restoring
+# needs a key and a touch — the same trust root, nothing new to sync. Encrypting
+# needs only public keys, so creating a snapshot never prompts for a touch.
+#
+# The snapshot is built to a temp file and verified BEFORE anything is written
+# to the destination, so a failed pull can never destroy a good snapshot.
+#
+# Usage:
+#   ha-backup                    create a snapshot
+#   ha-backup --list             list snapshots, newest first, with ages
+#   ha-backup --restore F DIR    decrypt F into DIR for inspection
+
+set -euo pipefail
+
+HA_HOST="${HA_HOST:-root@homeassistant.local}"
+HA_KEY="${HA_KEY:-$HOME/.ssh/id_rsa}"
+RECIPIENTS="${RECIPIENTS:-$HOME/.passage/store/.age-recipients}"
+IDENTITIES="${IDENTITIES:-$HOME/.passage/identities}"
+MIN_RECIPIENTS="${MIN_RECIPIENTS:-2}"
+RECOVERY="${RECOVERY:-/media/sandman/Recovery}"
+DEST_DIR="${DEST_DIR:-$RECOVERY/home-lab/ha-backups}"
+
+tmp=""
+trap 'rm -rf "${tmp:-}"' EXIT
+
+die() { printf '\033[1;31mha-backup:\033[0m %s\n' "$*" >&2; exit 1; }
+log() { printf '\033[1;34m[ha-backup]\033[0m %s\n' "$*"; }
+
+# Members we assert are present before accepting a snapshot. If HA moves these,
+# the assertion fires rather than silently shipping a useless archive.
+REQUIRED=(
+  homeassistant/.storage/core.entity_registry
+  homeassistant/.storage/core.device_registry
+  homeassistant/.storage/core.area_registry
+  homeassistant/automations.yaml
+  homeassistant/configuration.yaml
+)
+
+resolve_dest() {
+  # Recovery drive is attached only when needed, so fall back to a local
+  # spool. Both paths are reported so a snapshot is never "lost".
+  if [ -d "$RECOVERY" ]; then ON_DRIVE=1; else ON_DRIVE=0; DEST_DIR="$HOME/ha-backups"; fi
+}
+
+do_list() {
+  resolve_dest
+  [ "$ON_DRIVE" = 1 ] || log "Recovery drive not attached — listing local spool"
+  [ -d "$DEST_DIR" ] || die "no snapshots in $DEST_DIR"
+  local found=0 now age
+  now=$(date +%s)
+  while IFS= read -r f; do
+    found=1
+    age=$(( (now - $(stat -c %Y "$f")) / 86400 ))
+    printf '  %-40s %8s  %3d days old%s\n' "$(basename "$f")" \
+      "$(du -h "$f" | cut -f1)" "$age" "$([ "$age" -gt 30 ] && echo '  <- STALE')"
+  done < <(find "$DEST_DIR" -name '*.tgz.age' -type f -print0 | xargs -0 -r ls -1t)
+  [ "$found" = 1 ] || die "no snapshots found in $DEST_DIR"
+}
+
+do_restore() {
+  local src=$1 dest=$2
+  [ -f "$src" ] || die "no such snapshot: $src"
+  [ -r "$IDENTITIES" ] || die "missing age identities at $IDENTITIES"
+  mkdir -p "$dest"
+  log "decrypting $(basename "$src") — touch your YubiKey when it prompts"
+  age -d -i "$IDENTITIES" "$src" | tar -xzf - -C "$dest"
+  log "extracted to $dest"
+  log "review it, then copy pieces back deliberately — this does not write to HA"
+}
+
+do_backup() {
+  command -v age >/dev/null || die "age not installed"
+  [ -r "$RECIPIENTS" ] || die "missing age recipients at $RECIPIENTS"
+  [ -r "$HA_KEY" ]     || die "missing ssh key at $HA_KEY"
+
+  resolve_dest
+  if [ "$ON_DRIVE" = 0 ]; then
+    log "Recovery drive not attached — writing to $DEST_DIR (copy it over when you attach)"
+  fi
+  mkdir -p "$DEST_DIR"
+
+  local stamp out stanzas recips
+  tmp=$(mktemp -d) && chmod 700 "$tmp"
+
+  stamp=$(date +%Y-%m-%d_%H%M%S)
+  out="$DEST_DIR/ha-config-$stamp.tgz.age"
+  [ -e "$out" ] && die "$out already exists — refusing to overwrite a snapshot"
+
+  log "pulling from $HA_HOST"
+  ssh -o BatchMode=yes -o ConnectTimeout=10 -i "$HA_KEY" "$HA_HOST" \
+    'tar -czf - -C / \
+       --exclude="homeassistant/home-assistant_v2.db*" \
+       --exclude="homeassistant/.cache" \
+       --exclude="homeassistant/deps" \
+       --exclude="homeassistant/tts" \
+       --exclude="homeassistant/*.log*" \
+       --exclude="homeassistant/.ha_run.lock" \
+       homeassistant addon_configs' > "$tmp/snap.tgz" \
+    || die "pull failed — destination untouched"
+
+  # Verify before the destination is touched at all.
+  [ -s "$tmp/snap.tgz" ] || die "empty archive — destination untouched"
+  tar -tzf "$tmp/snap.tgz" > "$tmp/members" 2>/dev/null \
+    || die "archive is not readable gzip — destination untouched"
+
+  local missing=0
+  for m in "${REQUIRED[@]}"; do
+    grep -qxF "$m" "$tmp/members" || { printf '  missing: %s\n' "$m" >&2; missing=1; }
+  done
+  [ "$missing" = 0 ] || die "expected members absent — destination untouched"
+  grep -q '^addon_configs/' "$tmp/members" || die "addon_configs absent — destination untouched"
+
+  age -R "$RECIPIENTS" -o "$out" "$tmp/snap.tgz" || die "encryption failed"
+
+  # Postconditions on what actually landed.
+  [ -s "$out" ] || die "wrote an empty file to $out"
+  head -c 22 "$out" | grep -q 'age-encryption.org' || die "$out lacks an age header"
+
+  # Every recipient needs its own stanza, or one dead YubiKey locks the archive
+  # permanently. That redundancy is the entire reason for encrypting to both, so
+  # assert it rather than trusting the flag. Checked before the temp is dropped,
+  # so a bad archive is refused and never left sitting in the destination.
+  stanzas=$(head -c 2000 "$out" | strings | grep -c '^-> piv-p256' || true)
+  recips=$(grep -cE '^age1' "$RECIPIENTS")
+  [ "$recips" -ge "$MIN_RECIPIENTS" ] || { rm -f "$out"; die "only $recips recipient(s) in $RECIPIENTS; need >= $MIN_RECIPIENTS so one dead key cannot lock the archive — removed $out"; }
+  if [ "$stanzas" != "$recips" ]; then
+    rm -f "$out"
+    die "encrypted to $stanzas of $recips keys — removed $out"
+  fi
+
+  log "wrote $out"
+  printf '  %s members, %s encrypted, decryptable by %s of your YubiKeys\n' \
+    "$(wc -l < "$tmp/members")" "$(du -h "$out" | cut -f1)" \
+    "$stanzas"
+}
+
+case "${1:-}" in
+  --list)    do_list ;;
+  --restore) [ $# -eq 3 ] || die "usage: ha-backup --restore <file.tgz.age> <dir>"
+             do_restore "$2" "$3" ;;
+  "")        do_backup ;;
+  *)         die "unknown option: $1 (see --list, --restore)" ;;
+esac

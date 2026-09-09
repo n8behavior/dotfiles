@@ -296,6 +296,114 @@ claude mcp get unifi
 - **PIV is unreachable over SSH**, so the restore command has to run at the
   machine. See the YubiKey login gotchas above.
 
+## Home Assistant
+
+Ad-hoc read-only queries against the HA REST API — entity history, ESPHome
+device diagnostics — authenticate with a long-lived access token.
+
+HA runs on the mini PC at `homeassistant.local:8123` (`192.168.1.169`). Its
+console is terminal-only, but that does not matter: the token is created in the
+web UI, which is served over HTTP and reachable from a browser on any machine
+on the network.
+
+### The token
+
+HA has no scoped tokens. A long-lived access token carries the full permissions
+of the account that created it and defaults to a ten-year lifetime, so for
+read-only work create it under a purpose-made non-admin user
+(**Settings → People → Add Person**, admin unchecked) rather than the everyday
+account.
+
+**http://homeassistant.local:8123 → avatar at the bottom of the sidebar →
+Security → Long-lived access tokens → Create token.** HA displays it once.
+
+Then, from a real terminal:
+
+```
+passage insert -f homeassistant/token
+/media/sandman/Recovery/sync-secrets push
+passage show homeassistant/token > ~/.local/etc/homeassistant-token
+chmod 600 ~/.local/etc/homeassistant-token
+```
+
+To rotate it: create a replacement in the UI, delete the old one on the same
+page, then re-run the insert and push above and the restore on each machine.
+
+### New machine
+
+`restore-secrets` in `bootstrap-dotfiles` writes the token file from passage,
+skipping it if `homeassistant/token` is not in the store yet.
+
+### Files
+
+- `~/.local/etc/homeassistant-token` — the token, `0600`. Gitignored; lives in passage as `homeassistant/token`
+
+### Gotchas
+
+- **Insert and restore from a real terminal, not from inside a Claude
+  session.** Same constraint as the UniFi key above: `passage` needs a tty for
+  the YubiKey touch prompt, and a redirect hides it.
+- **`homeassistant.local` resolves over mDNS, not `getent`.** `curl` and
+  browsers reach it; anything going through NSS may not. Use `192.168.1.169`
+  where the name fails.
+- **Deleting the token in the UI is what actually revokes it.** Removing the
+  passage entry only removes the copy.
+
+### Backups — `ha-backup`
+
+HA's own snapshots land in `/backup` on the same disk they protect, and
+automatic backups were never enabled: the only one on the box was **443 days**
+stale when this was written. `ha-backup` covers the gap.
+
+```
+ha-backup                     create a snapshot
+ha-backup --list              list snapshots with ages (>30 days flagged STALE)
+ha-backup --restore F DIR     decrypt F into DIR for inspection
+```
+
+It pulls `/homeassistant` and `/addon_configs` over the SSH add-on, gzips, and
+encrypts with `age -R ~/.passage/store/.age-recipients` — the same two YubiKey
+recipients passage uses. **Restoring needs the Recovery drive and one YubiKey,
+nothing else.** There is no separate encryption key to store, and since
+encrypting needs only public keys, creating a snapshot never prompts for a
+touch (only restoring does).
+
+The recorder database is deliberately excluded. It is 148MB of the 156MB
+directory, it is history rather than configuration, and tarring live SQLite
+with an active `-wal` yields a torn copy. Without it a snapshot is **~160KB**,
+and a restore gives a working system with every device and name intact but no
+graphs.
+
+Why this rather than the git repo: `n8behavior/homeassistant-config` versions
+the YAML, which is the logic. It deliberately excludes `.storage/` — the
+entity, device and area registries, dashboards and integration config entries.
+That is the part you cannot rewrite from memory, and it is what this captures.
+
+#### Guarantees it enforces
+
+- **Built to a temp file and verified before the destination is touched.** A
+  failed pull cannot destroy a good snapshot.
+- **Asserts expected members** (`core.entity_registry`, `core.device_registry`,
+  `core.area_registry`, the YAML, and `addon_configs/`) before accepting an
+  archive, so a silently-empty pull is refused rather than shipped.
+- **Refuses fewer than `MIN_RECIPIENTS` (2) keys** and deletes the output. One
+  dead YubiKey must never be able to lock the archive permanently.
+- **Refuses to overwrite** an existing snapshot; filenames are second-granular.
+
+#### Gotchas
+
+- **`/addon_configs` is included on purpose.** It holds the SSH add-on's
+  `authorized_keys`; without it a bare-metal restore locks you out of the box
+  you are restoring.
+- **The Recovery drive is optional at create time.** If it is not attached the
+  snapshot goes to `~/ha-backups` and the script says so — copy it across when
+  you next attach the drive.
+- **Manual cadence is the weak point.** It suits secrets, which change rarely;
+  HA state changes on every device adoption or rename. `--list` flags anything
+  over 30 days.
+- **A backup you have never restored is a hope.** Do one `--restore` into a
+  scratch directory and look at it.
+
 ## WSL2 Setup
 
 ### Mounting ext4 USB Drives and YubiKey Access
