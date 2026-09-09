@@ -46,7 +46,7 @@ DEST_DIR="${DEST_DIR:-$RECOVERY/home-lab/ha-backups}"
 tmp=""
 trap 'rm -rf "${tmp:-}"' EXIT
 
-die() { printf '\033[1;31mha-backup:\033[0m %s\n' "$*" >&2; exit 1; }
+die() { printf '\033[1;31mha-backup:\033[0m %b\n' "$*" >&2; exit 1; }
 log() { printf '\033[1;34m[ha-backup]\033[0m %s\n' "$*"; }
 
 # Members we assert are present before accepting a snapshot. If HA moves these,
@@ -59,6 +59,19 @@ REQUIRED=(
   homeassistant/configuration.yaml
 )
 
+check_drive_copy() {
+  # The drive copy is what a bare-metal restore actually runs, since the
+  # dotfiles are not there yet. Canonical lives in the dotfiles repo, so warn
+  # rather than silently letting the two drift apart.
+  local drive="$RECOVERY/ha-backup"
+  [ -d "$RECOVERY" ] || return 0
+  if [ ! -f "$drive" ]; then
+    log "note: no copy on the Recovery drive — cp "$0" "$drive""
+  elif ! cmp -s "$0" "$drive"; then
+    log "note: Recovery drive copy differs from this one — cp "$0" "$drive""
+  fi
+}
+
 resolve_dest() {
   # Recovery drive is attached only when needed, so fall back to a local
   # spool. Both paths are reported so a snapshot is never "lost".
@@ -67,6 +80,7 @@ resolve_dest() {
 
 do_list() {
   resolve_dest
+  check_drive_copy
   [ "$ON_DRIVE" = 1 ] || log "Recovery drive not attached — listing local spool"
   [ -d "$DEST_DIR" ] || die "no snapshots in $DEST_DIR"
   local found=0 now age
@@ -83,7 +97,7 @@ do_list() {
 do_restore() {
   local src=$1 dest=$2
   [ -f "$src" ] || die "no such snapshot: $src"
-  [ -r "$IDENTITIES" ] || die "missing age identities at $IDENTITIES"
+  [ -r "$IDENTITIES" ] || die "no age identities at $IDENTITIES\n  On a fresh machine, first:  '$RECOVERY/sync-secrets' pull\n  then:  age-plugin-yubikey --identity > $IDENTITIES"
   mkdir -p "$dest"
   log "decrypting $(basename "$src") — touch your YubiKey when it prompts"
   age -d -i "$IDENTITIES" "$src" | tar -xzf - -C "$dest"
@@ -97,6 +111,7 @@ do_backup() {
   [ -r "$HA_KEY" ]     || die "missing ssh key at $HA_KEY"
 
   resolve_dest
+  check_drive_copy
   if [ "$ON_DRIVE" = 0 ]; then
     log "Recovery drive not attached — writing to $DEST_DIR (copy it over when you attach)"
   fi
