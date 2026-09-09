@@ -379,11 +379,11 @@ the YAML, which is the logic. It deliberately excludes `.storage/` — the
 entity, device and area registries, dashboards and integration config entries.
 That is the part you cannot rewrite from memory, and it is what this captures.
 
-
 A copy is deployed to the Recovery drive root beside `sync-secrets`, because a
 real recovery starts with the drive and a YubiKey and no dotfiles. This repo
 holds the canonical version; `ha-backup` compares itself against the drive copy
 whenever the drive is attached and prints the `cp` that reconciles them.
+
 #### Guarantees it enforces
 
 - **Built to a temp file and verified before the destination is touched.** A
