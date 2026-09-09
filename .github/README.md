@@ -31,6 +31,36 @@ After pushing, refresh the backup clone on the Recovery drive:
 git -C /media/sandman/Recovery/dotfiles pull --ff-only
 ```
 
+## Secrets sync
+
+Secrets live in passage; the Recovery drive holds a copy of the store and
+`sync-secrets` moves it either way. Neither direction can roll a secret
+backwards, and that guarantee is enforced at two levels.
+
+**The store.** `push` and `pull` copy with `cp -p`, so an entry's mtime is
+written once by `passage insert` and then travels with the file as a version
+stamp. A file is copied only when the destination is missing or the source is
+genuinely newer; when the destination holds the newer copy it is listed as
+*held back* and left alone. Equal mtimes with differing content also hold back
+— there is nothing to separate them, so the destination stands. Nothing is
+ever deleted: an entry present on only one side is reported and left.
+
+`sync-secrets status` shows what a `pull` would bring down; its held-back list
+is what a `push` would send.
+
+**The files decrypted out of it.** `restore-secrets` records, under
+`~/.local/state/bootstrap-secrets/`, which version of each ciphertext it last
+wrote and the mtime it left on the file. On a re-run it decrypts an entry only
+when the store has moved on, and refuses when the local file has changed since
+it was restored — a rotated `~/.claude/.credentials.json` or an appended
+`~/.ssh/known_hosts` is kept, with the `passage insert` needed to save it
+printed alongside. A re-run against an unchanged store therefore costs no
+YubiKey touches at all.
+
+`bootstrap-dotfiles` restores whenever the drive is mounted and delegates the
+store copy to `sync-secrets pull --yes`, preferring the drive's own copy of the
+script — the only one present before the dotfiles are cloned.
+
 ## YubiKey login (FIDO2 / pam-u2f)
 
 Touch + PIN replaces the password at the GDM greeter, the lock screen, `sudo`,

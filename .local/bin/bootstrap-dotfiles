@@ -3,8 +3,10 @@
 set -e
 cd "$HOME"
 
-# Recovery drive path for secrets
-RECOVERY_PATH="/media/sandman/Recovery/secrets"
+# Recovery drive paths: the root carries the sync-secrets symlink, which is the
+# only copy present before the dotfiles are cloned.
+RECOVERY_ROOT="/media/sandman/Recovery"
+RECOVERY_PATH="$RECOVERY_ROOT/secrets"
 
 install-common-packages() {
   echo 'INSTALLING: common-packages'
@@ -34,6 +36,77 @@ install-passage() {
   fi
 }
 
+# What restore-secret last wrote out: the version of the ciphertext, and the
+# mtime the file had when it was written. Together they say whether the copy on
+# disk is current, and whether anything has touched it since.
+SECRET_STATE="$HOME/.local/state/bootstrap-secrets"
+
+# Decrypt one passage entry to a file, unless there is a reason not to: the
+# entry is not in the store yet; the copy on disk was already written from this
+# version of the ciphertext; or that copy has been modified since it was
+# written, which means a credential rotated locally (Claude's token, an
+# appended known_hosts) would be rolled back by an older copy from the drive.
+# The version test also matters for the YubiKey: every decrypt costs a touch,
+# so an unchanged store must not ask for twenty of them.
+# Usage: restore-secret <entry> <dest> [mode]
+restore-secret() {
+  local entry=$1 dest=$2 mode=${3:-600}
+  local age="$HOME/.passage/store/$entry.age"
+  local stamp="$SECRET_STATE/$entry"
+  local version stamped_version stamped_mtime tmp
+
+  # Probe the ciphertext rather than decrypting: a decrypt needs the YubiKey
+  # and a touch, and redirecting its output hides the prompt asking for one.
+  if [[ ! -f "$age" ]]; then
+    echo "  SKIP  $entry (not yet in passage)"
+    return 0
+  fi
+
+  version=$(stat -c %Y "$age")
+  if [[ ! -e "$dest" ]]; then
+    : # nothing on disk to protect
+  elif [[ -f "$stamp" ]]; then
+    read -r stamped_version stamped_mtime < "$stamp" || true
+    if [[ "$stamped_version" == "$version" ]]; then
+      echo "  SKIP  $entry (already at the store's version)"
+      return 0
+    fi
+    # The store moved on. Its copy is the newest one that exists unless this
+    # machine has since written the file behind passage's back - which is what
+    # an mtime other than the one left by the last restore means. Comparing the
+    # file against the ciphertext's own mtime would not do here: the file is
+    # stamped with the moment it was restored, not the version it holds, so it
+    # always looks newer than the entry it came from.
+    if [[ "$(stat -c %Y "$dest")" != "$stamped_mtime" ]]; then
+      echo "  HOLD  $entry ($dest changed since it was restored)"
+      echo "        keep it with: passage insert $entry && sync-secrets push"
+      return 0
+    fi
+  elif [[ "$dest" -nt "$age" ]]; then
+    # No record of ever writing this one, so there is nothing better to go on
+    # than the two timestamps. Keep whichever is newer.
+    echo "  HOLD  $entry ($dest is newer than the store's copy)"
+    echo "        keep it with: passage insert $entry && sync-secrets push"
+    return 0
+  fi
+
+  echo "  WRITE $entry -> $dest (touch YubiKey when prompted)"
+  mkdir -p "$(dirname "$dest")"
+  # Decrypt to a neighbouring temp file: a failed decrypt under `set -e` would
+  # otherwise leave the destination truncated to nothing.
+  tmp=$(mktemp "$dest.XXXXXX")
+  chmod "$mode" "$tmp"
+  if passage show "$entry" > "$tmp"; then
+    mv "$tmp" "$dest"
+    mkdir -p "$(dirname "$stamp")"
+    echo "$version $(stat -c %Y "$dest")" > "$stamp"
+  else
+    rm -f "$tmp"
+    echo "ERROR: could not decrypt $entry"
+    return 1
+  fi
+}
+
 restore-secrets() {
   echo 'RESTORING: secrets from Recovery drive'
 
@@ -43,106 +116,80 @@ restore-secrets() {
     exit 1
   fi
 
-  # Restore passage store
-  mkdir -p ~/.passage/store
-  cp -r "$RECOVERY_PATH/passage-store/." ~/.passage/store/
-  chmod 700 ~/.passage/store
+  # The store copy belongs to sync-secrets: it preserves timestamps and never
+  # replaces an entry with an older one, so re-running this script on a
+  # provisioned machine cannot roll back a secret added since the last push.
+  # Prefer the drive's copy - on a fresh machine the dotfiles are not cloned
+  # yet, and the drive root symlinks it in for exactly this case.
+  local sync_secrets="$RECOVERY_ROOT/sync-secrets"
+  [[ -x "$sync_secrets" ]] || sync_secrets="$HOME/.local/bin/sync-secrets"
+  "$sync_secrets" pull --yes
 
-  # Setup YubiKey identity for passage
-  echo "Please insert your YubiKey..."
-  age-plugin-yubikey --identity > ~/.passage/identities
+  # Setup YubiKey identity for passage. Written once and then left alone:
+  # regenerating it against whichever key happens to be attached would narrow
+  # the identity file to that one key. Adding a key is a separate flow, in the
+  # recovery drive's README.
+  if [[ -f "$HOME/.passage/identities" ]]; then
+    echo "SKIPPING: YubiKey identity (~/.passage/identities already present)"
+  else
+    echo "Please insert your YubiKey..."
+    mkdir -p "$HOME/.passage"
+    age-plugin-yubikey --identity > "$HOME/.passage/identities"
+  fi
 
-  # Restore SSH keys
-  echo "Restoring SSH keys (touch YubiKey when prompted)..."
+  echo "Restoring SSH keys..."
   mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  passage show ssh/id_ed25519 > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
-  passage show ssh/id_ed25519.pub > ~/.ssh/id_ed25519.pub && chmod 644 ~/.ssh/id_ed25519.pub
-  passage show ssh/id_rsa > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
-  passage show ssh/id_rsa.pub > ~/.ssh/id_rsa.pub && chmod 644 ~/.ssh/id_rsa.pub
-  passage show ssh/known_hosts > ~/.ssh/known_hosts
+  restore-secret ssh/id_ed25519     ~/.ssh/id_ed25519
+  restore-secret ssh/id_ed25519.pub ~/.ssh/id_ed25519.pub 644
+  restore-secret ssh/id_rsa         ~/.ssh/id_rsa
+  restore-secret ssh/id_rsa.pub     ~/.ssh/id_rsa.pub     644
+  restore-secret ssh/known_hosts    ~/.ssh/known_hosts    644
 
-  # Restore GPG keys
+  # GPG imports merge into the keyring rather than replacing it, so there is
+  # nothing here for the freshness test to protect.
   echo "Restoring GPG keys..."
   passage show gpg/secret-keys | gpg --import
   passage show gpg/public-keys | gpg --import
   passage show gpg/ownertrust | gpg --import-ownertrust
 
-  # Restore SOPS key
   echo "Restoring SOPS key..."
-  mkdir -p ~/.config/sops/age
-  passage show sops/age-key > ~/.config/sops/age/keys.txt
-  chmod 600 ~/.config/sops/age/keys.txt
+  restore-secret sops/age-key ~/.config/sops/age/keys.txt
 
-  # Restore keyrings
   echo "Restoring keyrings..."
-  mkdir -p ~/.local/share/keyrings
-  passage show keyrings/login.keyring > ~/.local/share/keyrings/login.keyring
-  passage show keyrings/user.keystore > ~/.local/share/keyrings/user.keystore
+  restore-secret keyrings/login.keyring ~/.local/share/keyrings/login.keyring
+  restore-secret keyrings/user.keystore ~/.local/share/keyrings/user.keystore
 
-  # Restore atuin key
   echo "Restoring atuin key..."
-  mkdir -p ~/.local/share/atuin
-  passage show atuin/key > ~/.local/share/atuin/key
-  chmod 600 ~/.local/share/atuin/key
+  restore-secret atuin/key ~/.local/share/atuin/key
 
-  # Restore gh token (for headless environments without keyring)
-  echo "Restoring GitHub CLI token..."
-  passage show gh/token | gh auth login --with-token
+  # Restore gh token (for headless environments without keyring). gh keeps the
+  # token in the keyring where there is one and in hosts.yml otherwise, so
+  # neither is a file restore-secret can write; test hosts.yml for an existing
+  # login and leave a working one alone.
+  if [[ -f "$HOME/.passage/store/gh/token.age" ]] &&
+     [[ ! -s "$HOME/.config/gh/hosts.yml" ]]; then
+    echo "Restoring GitHub CLI token (touch YubiKey when prompted)..."
+    passage show gh/token | gh auth login --with-token
+  else
+    echo "SKIPPING: GitHub CLI token (already logged in)"
+  fi
 
-  # Restore Claude Code credentials
   echo "Restoring Claude Code credentials..."
-  mkdir -p ~/.claude
-  passage show claude/credentials > ~/.claude/.credentials.json
-  chmod 600 ~/.claude/.credentials.json
+  restore-secret claude/credentials ~/.claude/.credentials.json
 
-  # Restore FIDO2 PAM mapping (absent until the first key is enrolled).
-  # Test for the ciphertext rather than decrypting: a decrypt needs the YubiKey
-  # and a touch, and redirecting its output hides the prompt asking for one.
-  if [[ -f "$HOME/.passage/store/yubico/u2f_keys.age" ]]; then
-    echo "Restoring FIDO2 PAM mapping (touch YubiKey when prompted)..."
-    mkdir -p ~/.config/Yubico && chmod 700 ~/.config/Yubico
-    passage show yubico/u2f_keys > ~/.config/Yubico/u2f_keys
-    chmod 600 ~/.config/Yubico/u2f_keys
-  else
-    echo "SKIPPING: FIDO2 PAM mapping (not yet in passage)"
-  fi
+  # FIDO2 PAM mapping, absent until the first key is enrolled.
+  mkdir -p ~/.config/Yubico && chmod 700 ~/.config/Yubico
+  restore-secret yubico/u2f_keys ~/.config/Yubico/u2f_keys
 
-  # UniFi Network API key read by the unifi-mcp launcher. Absent until it is
-  # added with `passage insert unifi/api-key`, so probe the ciphertext rather
-  # than decrypting, as with the FIDO2 mapping above.
-  if [[ -f "$HOME/.passage/store/unifi/api-key.age" ]]; then
-    echo "Restoring UniFi API key (touch YubiKey when prompted)..."
-    mkdir -p ~/.local/etc
-    passage show unifi/api-key > ~/.local/etc/unifi-api-key
-    chmod 600 ~/.local/etc/unifi-api-key
-  else
-    echo "SKIPPING: UniFi API key (not yet in passage)"
-  fi
-
-  # Sagemcom cable modem admin login, read by the DOCSIS stats collector. One
-  # multiline entry so a single touch yields both fields: password on line 1,
-  # `username:` on line 2.
-  if [[ -f "$HOME/.passage/store/modem/admin.age" ]]; then
-    echo "Restoring modem admin credentials (touch YubiKey when prompted)..."
-    mkdir -p ~/.local/etc
-    passage show modem/admin > ~/.local/etc/modem-admin
-    chmod 600 ~/.local/etc/modem-admin
-  else
-    echo "SKIPPING: modem admin credentials (not yet in passage)"
-  fi
-
-  # Home Assistant long-lived access token, read by ad-hoc queries against the
-  # HA REST API. Absent until it is added with `passage insert
-  # homeassistant/token`, so probe the ciphertext rather than decrypting, as
-  # with the entries above.
-  if [[ -f "$HOME/.passage/store/homeassistant/token.age" ]]; then
-    echo "Restoring Home Assistant token (touch YubiKey when prompted)..."
-    mkdir -p ~/.local/etc
-    passage show homeassistant/token > ~/.local/etc/homeassistant-token
-    chmod 600 ~/.local/etc/homeassistant-token
-  else
-    echo "SKIPPING: Home Assistant token (not yet in passage)"
-  fi
+  # UniFi Network API key read by the unifi-mcp launcher, modem admin login
+  # read by the DOCSIS stats collector (one multiline entry so a single touch
+  # yields both fields: password on line 1, `username:` on line 2), and the
+  # Home Assistant long-lived token used for ad-hoc REST queries. Each is
+  # absent until added with `passage insert`.
+  echo "Restoring service credentials..."
+  restore-secret unifi/api-key        ~/.local/etc/unifi-api-key
+  restore-secret modem/admin          ~/.local/etc/modem-admin
+  restore-secret homeassistant/token  ~/.local/etc/homeassistant-token
 
   echo "Secrets restored successfully!"
 }
