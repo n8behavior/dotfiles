@@ -39,13 +39,13 @@ color_yellow = '#d79921'
 color_fg0 = '#3c3836'
 color_bg1 = '#ebdbb2'
 color_bg3 = '#bdae93'
-color_blue = '#076678'
-color_aqua = '#427b58'
+color_blue = '#a9c0ab'   # gruvbox blue tinted 45% into bg0; dark fg0 text stays readable
+color_aqua = '#c8d4a6'   # gruvbox aqua tinted 35% into bg0
 color_green = '#79740e'
-color_orange = '#af3a03'
+color_orange = '#ecb67d' # gruvbox orange tinted 40% into bg0
 color_purple = '#8f3f71'
 color_red = '#9d0006'
-color_yellow = '#b57614'
+color_yellow = '#edce85' # gruvbox yellow tinted 40% into bg0
 [os]
 disabled = false
 style = "bg:color_orange fg:color_fg0"
