@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fan out GNOME color-scheme to tmux, starship, gnome-terminal, GTK chrome.
+# Fan out GNOME color-scheme to tmux, starship, gnome-terminal, GTK chrome, cursor.
 # Source of truth: org.gnome.desktop.interface color-scheme
 # Idempotent; safe to invoke at any time.
 set -euo pipefail
@@ -49,9 +49,18 @@ fi
 
 if [ "$mode" = dark ]; then
     gtk_theme=Gruvbox-Dark
+    cursor_theme=Yaru
 else
     gtk_theme=Gruvbox-Light
+    cursor_theme=Yaru-ibeam
 fi
 if [ -d "$HOME/.themes/$gtk_theme" ] || [ -d "/usr/share/themes/$gtk_theme" ]; then
     gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+fi
+
+# Yaru's thin I-beam vanishes on the light background, so light mode uses
+# Yaru-ibeam's bold red one. Red reads poorly on dark, where stock Yaru's
+# white outline is enough.
+if [ -d "$HOME/.local/share/icons/$cursor_theme" ] || [ -d "/usr/share/icons/$cursor_theme" ]; then
+    gsettings set org.gnome.desktop.interface cursor-theme "$cursor_theme"
 fi

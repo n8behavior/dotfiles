@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Regenerate cursors/text: a bold, shadowless I-beam in Gruvbox red with a
+# dark outline. It's all rectangles, so every pixel is fill, outline or clear
+# and needs no anti-aliasing. Writes the Xcursor format directly.
+set -euo pipefail
+
+fill=cc241d    # gruvbox red
+outline=3c3836 # gruvbox light-mode foreground
+sizes=(24 32 48 64 96)
+# Fill rectangles (x0 y0 x1 y1) on a 24px grid: top serif, bottom serif, stem.
+grid=(7 2 17 4  7 20 17 22  11 2 13 22)
+
+le32() { printf '\\x%02x\\x%02x\\x%02x\\x%02x' $(($1 & 255)) $(($1 >> 8 & 255)) $(($1 >> 16 & 255)) $(($1 >> 24 & 255)); }
+# Opaque ARGB, little-endian: bytes are B G R A.
+pixel() { printf '\\x%s\\x%s\\x%s\\xff' "${1:4:2}" "${1:2:2}" "${1:0:2}"; }
+
+f=$(pixel "$fill")
+o=$(pixel "$outline")
+c='\x00\x00\x00\x00'
+
+inside() { # x y pad rects...
+    local x=$1 y=$2 p=$3 i
+    shift 3
+    for ((i = 0; i < $#; i += 4)); do
+        local r=("${@:i+1:4}")
+        ((x >= r[0] - p && x < r[2] + p && y >= r[1] - p && y < r[3] + p)) && return 0
+    done
+    return 1
+}
+
+out="$(dirname "$0")/cursors/text"
+tmp=$(mktemp "$out.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+
+pos=$((16 + 12 * ${#sizes[@]}))
+{
+    printf '%b' "Xcur$(le32 16)$(le32 65536)$(le32 ${#sizes[@]})"
+    for s in "${sizes[@]}"; do
+        printf '%b' "$(le32 0xfffd0002)$(le32 "$s")$(le32 "$pos")"
+        pos=$((pos + 36 + s * s * 4))
+    done
+    for s in "${sizes[@]}"; do
+        rects=()
+        for v in "${grid[@]}"; do rects+=($(((v * s + 12) / 24))); done
+        t=$(((s + 12) / 24))
+        printf '%b' "$(le32 36)$(le32 0xfffd0002)$(le32 "$s")$(le32 1)$(le32 "$s")$(le32 "$s")$(le32 $((s / 2)))$(le32 $((s / 2)))$(le32 0)"
+        for ((y = 0; y < s; y++)); do
+            row=
+            for ((x = 0; x < s; x++)); do
+                if inside "$x" "$y" 0 "${rects[@]}"; then row+=$f
+                elif inside "$x" "$y" "$t" "${rects[@]}"; then row+=$o
+                else row+=$c
+                fi
+            done
+            printf '%b' "$row"
+        done
+    done
+} >"$tmp"
+chmod 644 "$tmp"
+mv "$tmp" "$out"
+trap - EXIT

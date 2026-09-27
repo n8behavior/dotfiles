@@ -55,6 +55,10 @@
 !.local/etc/modem.env
 !.local/etc/settings.json
 !.local/etc/unifi.env
+!.local/share/
+!.local/share/icons/
+!.local/share/icons/Yaru-ibeam/
+!.local/share/icons/Yaru-ibeam/**
 !.profile
 !.selected_editor
 !.tmux.conf
