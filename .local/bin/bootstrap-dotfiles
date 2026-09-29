@@ -19,8 +19,9 @@ RECOVERY_PATH="$RECOVERY_ROOT/secrets"
 install-common-packages() {
   echo 'INSTALLING: common-packages'
   # gnome-terminal is not the default from 26.04 (Ptyxis is), but it is the one
-  # setup-gnome-terminal-gruvbox and theme-sync configure.
-  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc gnome-terminal
+  # setup-gnome-terminal-gruvbox and theme-sync configure. openssh-server is not in
+  # a desktop install; setup-fido-login hardens it after it lands here.
+  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc gnome-terminal openssh-server
   sudo apt remove -y nano
   git lfs install
 }

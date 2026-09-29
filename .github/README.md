@@ -176,7 +176,8 @@ also needs an age identity for passage — see the Recovery drive's README.
 - **`sshd` includes `common-auth`.** With password auth enabled, a remote login
   would cue a touch on the authenticator attached to the *server*.
   `setup-fido-login` drops in `PasswordAuthentication no`. Pubkey auth is
-  unaffected.
+  unaffected. `bootstrap-dotfiles` installs `openssh-server` first, since a
+  desktop install lacks it and the step is skipped without it.
 - **`NOPASSWD` in sudoers bypasses PAM entirely.** `sudo` then never consults
   `pam_u2f`, so no touch, no PIN. Keep `/etc/sudoers.d/sandman` renamed to
   `sandman.disabled` (sudo skips filenames containing a dot).
