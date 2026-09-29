@@ -7,6 +7,9 @@
    /media/sandman/Recovery/setup-sandman
    ```
 
+   Ubuntu 26.04 mounts the drive at `/run/media/sandman/Recovery` instead; the
+   scripts look in both places.
+
 ## Setup without Recovery Drive
 
 `gh` will need authorized with `gh auth token` and SSH and GPG keys will be missing

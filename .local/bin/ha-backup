@@ -42,7 +42,15 @@ RECIPIENTS="${RECIPIENTS:-$HOME/.passage/store/.age-recipients}"
 IDENTITIES="${IDENTITIES:-$HOME/.passage/identities}"
 KEEP=0
 MIN_RECIPIENTS="${MIN_RECIPIENTS:-2}"
-RECOVERY="${RECOVERY:-/media/sandman/Recovery}"
+# Ubuntu 26.04 mounts the drive under /run/media, 24.04 under /media.
+if [ -z "${RECOVERY:-}" ]; then
+  RECOVERY="${RECOVERY_ROOT:-/media/sandman/Recovery}"
+  if [ -z "${RECOVERY_ROOT:-}" ]; then
+    for dir in /run/media/sandman/Recovery /media/sandman/Recovery; do
+      [ -d "$dir" ] && { RECOVERY="$dir"; break; }
+    done
+  fi
+fi
 DEST_DIR="${DEST_DIR:-$RECOVERY/home-lab/ha-backups}"
 
 tmp=""

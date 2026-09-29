@@ -4,8 +4,16 @@ set -e
 cd "$HOME"
 
 # Recovery drive paths: the root carries the sync-secrets symlink, which is the
-# only copy present before the dotfiles are cloned.
-RECOVERY_ROOT="/media/sandman/Recovery"
+# only copy present before the dotfiles are cloned. Ubuntu 26.04 mounts it under
+# /run/media, 24.04 under /media; an exported RECOVERY_ROOT wins. Exported so
+# sync-secrets finds the same drive.
+if [[ -z "${RECOVERY_ROOT:-}" ]]; then
+  RECOVERY_ROOT="/media/sandman/Recovery"
+  for dir in /run/media/sandman/Recovery /media/sandman/Recovery; do
+    [[ -d "$dir" ]] && { RECOVERY_ROOT="$dir"; break; }
+  done
+fi
+export RECOVERY_ROOT
 RECOVERY_PATH="$RECOVERY_ROOT/secrets"
 
 install-common-packages() {
