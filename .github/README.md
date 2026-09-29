@@ -4,11 +4,13 @@
 2. run the setup
 
    ```
-   /media/sandman/Recovery/setup-sandman
+   R=$(findmnt -n -o TARGET -S LABEL=Recovery)
+   "$R/setup-sandman"
    ```
 
-   Ubuntu 26.04 mounts the drive at `/run/media/sandman/Recovery` instead; the
-   scripts look in both places.
+   The drive mounts at `/media/sandman/Recovery` on Ubuntu 24.04 and
+   `/run/media/sandman/Recovery` on 26.04, so `R` looks it up; the scripts check
+   both places themselves. `$R` below means the same.
 
 ## Setup without Recovery Drive
 
@@ -31,7 +33,7 @@ added in the `.gitignore`.
 After pushing, refresh the backup clone on the Recovery drive:
 
 ```
-git -C /media/sandman/Recovery/dotfiles pull --ff-only
+git -C "$R"/dotfiles pull --ff-only
 ```
 
 ## Secrets sync
@@ -275,7 +277,7 @@ To rotate it: create a new key in the controller, then
 
 ```
 passage insert -f unifi/api-key
-/media/sandman/Recovery/sync-secrets push
+sync-secrets push
 ```
 
 and re-run the restore command below on each machine.
@@ -300,7 +302,7 @@ into `~/.local/bin`, `restore-secrets` writes the key file from passage, and
 After `git pull` on a machine that predates this section:
 
 ```
-/media/sandman/Recovery/sync-secrets pull
+sync-secrets pull
 GOBIN=~/.local/bin go install github.com/claytono/go-unifi-mcp/cmd/go-unifi-mcp@latest
 passage show unifi/api-key > ~/.local/etc/unifi-api-key && chmod 600 ~/.local/etc/unifi-api-key
 claude mcp add --scope user unifi -- ~/.local/bin/unifi-mcp
@@ -357,7 +359,7 @@ Then, from a real terminal:
 
 ```
 passage insert -f homeassistant/token
-/media/sandman/Recovery/sync-secrets push
+sync-secrets push
 passage show homeassistant/token > ~/.local/etc/homeassistant-token
 chmod 600 ~/.local/etc/homeassistant-token
 ```
@@ -417,12 +419,12 @@ the YAML, which is the logic. It deliberately excludes `.storage/` — the
 entity, device and area registries, dashboards and integration config entries.
 That is the part you cannot rewrite from memory, and it is what this captures.
 
-The Recovery drive reaches it at `/media/sandman/Recovery/ha-backup`, a relative
+The Recovery drive reaches it at `$R/ha-backup`, a relative
 symlink into the `dotfiles/` clone on that drive -- as is `sync-secrets`. A real
 recovery starts with the drive and a YubiKey and no dotfiles installed, so both
 have to be reachable from the drive; symlinking rather than copying keeps one
-version-controlled source. Refresh with `git -C /media/sandman/Recovery/dotfiles
-pull --ff-only` after pushing, or the drive runs stale tooling.
+version-controlled source. Refresh with `git -C "$R"/dotfiles pull
+--ff-only` after pushing, or the drive runs stale tooling.
 
 #### Guarantees it enforces
 
