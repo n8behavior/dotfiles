@@ -10,7 +10,9 @@ RECOVERY_PATH="$RECOVERY_ROOT/secrets"
 
 install-common-packages() {
   echo 'INSTALLING: common-packages'
-  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc
+  # gnome-terminal is not the default from 26.04 (Ptyxis is), but it is the one
+  # setup-gnome-terminal-gruvbox and theme-sync configure.
+  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc gnome-terminal
   sudo apt remove -y nano
   git lfs install
 }
@@ -272,11 +274,18 @@ LAZYVIM_JSON
 install-yubikey-manager() {
   echo 'INSTALLING: YubiKey Manager'
   type -p add-apt-repository || install-common-packages
-  sudo add-apt-repository --yes ppa:yubico/stable
+  # The PPA publishes for some releases only (noble yes, resolute no). Adding it
+  # where it has no build breaks every later `apt update`, and those releases
+  # already carry current builds in the archive.
+  local codename
+  codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+  if curl -fsI -o /dev/null "https://ppa.launchpadcontent.net/yubico/stable/ubuntu/dists/$codename/Release"; then
+    sudo add-apt-repository --yes ppa:yubico/stable
+  fi
   # fido2-tools gives setup-fido-login the fido2-assert probe it uses to order
   # u2f_keys for the attached key. It runs later in this script, and installs
   # the package itself when run standalone; pulling it in here means the PPA
-  # build rather than the older one in universe.
+  # build, where there is one, rather than the older one in universe.
   sudo apt install -y yubikey-manager fido2-tools
 }
 

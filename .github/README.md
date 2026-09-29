@@ -234,6 +234,7 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 ### Requirements
 
 - `sassc` (apt) — needed to compile Gruvbox-GTK-Theme. Included in `install-common-packages`.
+- `gnome-terminal` (apt) — the terminal this configures. Ubuntu 26.04 ships Ptyxis instead, so `install-common-packages` installs it.
 - `f-person/auto-dark-mode.nvim` — pulled in by LazyVim; run `:Lazy sync` after first update.
 
 ## UniFi Network MCP
