@@ -163,10 +163,5 @@ fi
 if [ -f '/usr/lib/google-cloud-sdk/path.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/path.bash.inc'; fi
 if [ -f '/usr/lib/google-cloud-sdk/completion.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/completion.bash.inc'; fi
 
-. "$HOME/.atuin/bin/env"
-
-[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
-eval "$(atuin init bash)"
-
 # The shared riff (Cloud Run)
 export RIFF_SERVER=https://riff-server-816917641970.us-central1.run.app

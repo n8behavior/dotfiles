@@ -161,9 +161,6 @@ restore-secrets() {
   restore-secret keyrings/login.keyring ~/.local/share/keyrings/login.keyring
   restore-secret keyrings/user.keystore ~/.local/share/keyrings/user.keystore
 
-  echo "Restoring atuin key..."
-  restore-secret atuin/key ~/.local/share/atuin/key
-
   # Restore gh token (for headless environments without keyring). gh keeps the
   # token in the keyring where there is one and in hosts.yml otherwise, so
   # neither is a file restore-secret can write; test hosts.yml for an existing
@@ -470,16 +467,7 @@ setup-dotfiles() {
 setup-dotfiles
 
 # Ensure paths are available for rest of script (dotfiles may have updated .bashrc)
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin:$PATH"
-
-install-atuin() {
-  echo 'INSTALLING: Atuin shell history'
-  if [[ -d ~/.atuin ]]; then
-    echo "Atuin already installed"
-    return 0
-  fi
-  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
-}
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
 install-fzf() {
   echo 'INSTALLING: fzf (latest from GitHub)'
@@ -493,7 +481,6 @@ install-fzf() {
 }
 
 echo 'INSTALLING: Extra Goodies'
-install-atuin
 install-nvm
 install-fzf
 install-golang
