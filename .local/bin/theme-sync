@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fan out GNOME color-scheme to tmux, starship, gnome-terminal, GTK chrome, cursor.
+# Fan out GNOME color-scheme to tmux, starship, gnome-terminal, Ptyxis, GTK chrome, cursor.
 # Source of truth: org.gnome.desktop.interface color-scheme
 # Idempotent; safe to invoke at any time.
 set -euo pipefail
@@ -44,6 +44,19 @@ if [ -n "${GRUVBOX_TERM_UUID:-}" ]; then
         dconf write "${profile_path}foreground-color" "'#3c3836'"
         dconf write "${profile_path}palette" \
             "['#fbf1c7', '#cc241d', '#98971a', '#d79921', '#458588', '#b16286', '#689d6a', '#7c6f64', '#928374', '#9d0006', '#79740e', '#b57614', '#076678', '#8f3f71', '#427b58', '#3c3836']"
+    fi
+fi
+
+# Ptyxis (the default terminal from Ubuntu 26.04): its built-in Gruvbox palette
+# has a light and a dark half and it picks between them from color-scheme by
+# itself, so there is nothing to rewrite per toggle. Ubuntu pins it to dark with
+# the Ubuntu palette, though, so point it at the system style and at Gruvbox.
+if ptyxis_uuid=$(gsettings get org.gnome.Ptyxis default-profile-uuid 2>/dev/null); then
+    gsettings set org.gnome.Ptyxis interface-style system
+    ptyxis_uuid=${ptyxis_uuid//\'/}
+    # Empty until Ptyxis has been started once; the next run picks it up.
+    if [ -n "$ptyxis_uuid" ]; then
+        gsettings set "org.gnome.Ptyxis.Profile:/org/gnome/Ptyxis/Profiles/${ptyxis_uuid}/" palette Gruvbox
     fi
 fi
 

@@ -217,6 +217,8 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 
                                      ┌► nvim (auto-dark-mode.nvim polls
                                         gsettings directly)
+                                     └► Ptyxis (follows color-scheme itself,
+                                        once theme-sync has set it up)
 ```
 
 ### Commands
@@ -224,7 +226,7 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 | Command | What it does |
 |---|---|
 | `theme-toggle` | Flip `color-scheme` between `prefer-dark` and `default`. Bind to a keyboard shortcut if you want. |
-| `theme-sync` | Idempotent fanout: rewrites `~/.config/tmux/theme.conf`, sed-edits the starship palette line, dconf-writes the 16-color palette of the single `Gruvbox` gnome-terminal profile (VTE reacts instantly, so open terminals flip live), sets the GTK and cursor themes. Runs automatically via the systemd listener. |
+| `theme-sync` | Idempotent fanout: rewrites `~/.config/tmux/theme.conf`, sed-edits the starship palette line, dconf-writes the 16-color palette of the single `Gruvbox` gnome-terminal profile (VTE reacts instantly, so open terminals flip live), points Ptyxis at the system style and its built-in `Gruvbox` palette, sets the GTK and cursor themes. Runs automatically via the systemd listener. |
 | `theme-sync-install` | One-time post-`git pull` setup — installs `Gruvbox-GTK-Theme` into `~/.themes` and enables the systemd service. `bootstrap-dotfiles` does the same work inline on fresh machines. |
 
 ### Files
@@ -240,7 +242,7 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 ### Requirements
 
 - `sassc` (apt) — needed to compile Gruvbox-GTK-Theme. Included in `install-common-packages`.
-- `gnome-terminal` (apt) — the terminal this configures. Ubuntu 26.04 ships Ptyxis instead, so `install-common-packages` installs it.
+- A terminal this configures: Ptyxis (the Ubuntu 26.04 default) or `gnome-terminal` (the 24.04 default, which `install-common-packages` still installs on 26.04).
 - `f-person/auto-dark-mode.nvim` — pulled in by LazyVim; run `:Lazy sync` after first update.
 
 ## UniFi Network MCP
