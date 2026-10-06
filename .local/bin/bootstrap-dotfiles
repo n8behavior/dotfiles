@@ -414,6 +414,13 @@ setup-theme-sync() {
   "$HOME/.local/bin/theme-sync"
 }
 
+setup-power-profile-sync() {
+  type -p powerprofilesctl || return 0
+  echo 'ENABLING: power-profile-sync.service (performance on AC, power-saver on battery)'
+  systemctl --user daemon-reload
+  systemctl --user enable --now power-profile-sync.service
+}
+
 setup-terminal() {
   # Set caps lock as ctrl (desktop only)
   type -p dconf && dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
@@ -497,6 +504,7 @@ install-go-unifi-mcp
 setup-editor
 install-lazyvim
 setup-terminal
+setup-power-profile-sync
 install-claude-code
 setup-unifi-mcp
 cargo install aichat

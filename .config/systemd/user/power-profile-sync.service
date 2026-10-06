@@ -1,0 +1,13 @@
+[Unit]
+Description=Power profile follows the power source (performance on AC, power-saver on battery)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/power-profile-sync --watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
