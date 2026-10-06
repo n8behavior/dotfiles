@@ -1,11 +1,31 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "BASH_ENV": "/home/sandman/.bash_functions"
+    "BASH_ENV": "/home/sandman/.bash_functions",
+    "CLAUDE_CODE_TMPDIR": "/home/sandman/.cache/claude-tmp"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+    "allow": [
+      "mcp__plugin_riff_riff",
+      "mcp__riff",
+      "Bash(riff)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge * --auto --squash)",
+      "Bash(gh pr comment *)",
+      "Bash(gh pr view *)",
+      "Bash(gh api repos/n8behavior/dotfiles/statuses/*)"
+    ],
+    "deny": [
+      "Bash(git push * main)",
+      "Bash(git push * main *)",
+      "Bash(git push *:main)",
+      "Bash(git push *:main *)",
+      "Bash(git push *:refs/heads/main)",
+      "Bash(git push *:refs/heads/main *)",
+      "Bash(gh pr merge *--admin*)"
+    ]
   },
   "hooks": {
     "Stop": [
@@ -15,14 +35,28 @@
       }
     ]
   },
+  "statusLine": {
+    "type": "command",
+    "command": "riff statusline"
+  },
   "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "riff@riff": true
+  },
+  "extraKnownMarketplaces": {
+    "riff": {
+      "source": {
+        "source": "directory",
+        "path": "/home/sandman/.local/share/riff/claude-plugin"
+      }
+    }
   },
   "alwaysThinkingEnabled": true,
   "tui": "default",
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
   "voiceEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754015932533
@@ -35,6 +69,5 @@
         "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
       ]
     }
-  },
-  "agentPushNotifEnabled": true
+  }
 }

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Set the power profile from the power source: performance on AC, power-saver on
+# battery. With --watch, stay running and switch again each time the source
+# changes. Only a change of source sets the profile, so a profile picked by hand
+# in the quick settings holds until the next plug or unplug.
+#
+# Machines without a system battery (desktops such as thelio) exit at once: they
+# are always on AC, and the profile there stays whatever was picked by hand.
+# Batteries with scope "Device" belong to mice and keyboards, not the machine.
+set -euo pipefail
+
+has-system-battery() {
+  local ps
+  for ps in /sys/class/power_supply/*; do
+    [[ "$(cat "$ps/type" 2>/dev/null)" == Battery ]] || continue
+    [[ "$(cat "$ps/scope" 2>/dev/null)" == Device ]] && continue
+    return 0
+  done
+  return 1
+}
+
+on-ac() {
+  local ps
+  for ps in /sys/class/power_supply/*; do
+    [[ "$(cat "$ps/type" 2>/dev/null)" == Mains ]] || continue
+    [[ "$(cat "$ps/online" 2>/dev/null)" == 1 ]] && return 0
+  done
+  return 1
+}
+
+source-now() {
+  if on-ac; then echo ac; else echo battery; fi
+}
+
+apply() {
+  local profile=power-saver
+  [[ "$1" == ac ]] && profile=performance
+  echo "power source: $1 -> $profile"
+  powerprofilesctl set "$profile"
+}
+
+has-system-battery || { echo "no system battery: leaving the power profile alone"; exit 0; }
+command -v powerprofilesctl >/dev/null || { echo "powerprofilesctl not installed" >&2; exit 1; }
+
+last=$(source-now)
+apply "$last"
+[[ "${1:-}" == --watch ]] || exit 0
+
+# upower prints a line for every device update, battery level ticks included;
+# compare against the last source so only a real change sets the profile.
+upower --monitor | while read -r _; do
+  now=$(source-now)
+  [[ "$now" == "$last" ]] && continue
+  last=$now
+  apply "$now"
+done
