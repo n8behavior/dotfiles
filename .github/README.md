@@ -245,6 +245,43 @@ color-scheme ──► theme-sync.service ──► tmux, starship,
 - A terminal this configures: Ptyxis (the Ubuntu 26.04 default) or `gnome-terminal` (the 24.04 default, which `install-common-packages` still installs on 26.04).
 - `f-person/auto-dark-mode.nvim` — pulled in by LazyVim; run `:Lazy sync` after first update.
 
+## Power profile sync (AC / battery)
+
+On a laptop the power profile follows the power source: **performance** on AC,
+**power-saver** on battery. A user-level systemd service watches upower and
+calls `powerprofilesctl` (power-profiles-daemon, in a stock Ubuntu desktop).
+
+```
+plug / unplug ──► upower ──► power-profile-sync.service ──► powerprofilesctl set
+                  (--monitor)  (only on a change of source)
+```
+
+Only a change of source sets the profile. A profile picked by hand in Quick
+Settings holds until the next plug or unplug; upower's battery-level updates
+do not reset it.
+
+Machines without a system battery (thelio) exit at once and keep whatever
+profile is picked by hand. Batteries with `scope=Device` — mice, keyboards —
+do not count as a system battery.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `power-profile-sync` | Set the profile once from the current power source. |
+| `power-profile-sync --watch` | Set it, then again on each change of source. What the service runs. |
+| `journalctl --user -u power-profile-sync` | One line per switch: `power source: battery -> power-saver`. |
+
+### New or existing machine
+
+`setup-power-profile-sync` in `bootstrap-dotfiles` enables and starts the
+service. It is a no-op without `powerprofilesctl`.
+
+### Files
+
+- `.local/bin/power-profile-sync`
+- `.config/systemd/user/power-profile-sync.service`
+
 ## UniFi Network MCP
 
 Claude Code talks to the UDM SE's Network controller through
