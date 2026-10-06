@@ -6,7 +6,6 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "mcp__plugin_riff_riff",
       "mcp__riff",
@@ -25,7 +24,8 @@
       "Bash(git push *:refs/heads/main)",
       "Bash(git push *:refs/heads/main *)",
       "Bash(gh pr merge *--admin*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "hooks": {
     "Stop": [
