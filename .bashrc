@@ -156,12 +156,10 @@ if [ -d "$HOME/.local/bin" ]; then
   PATH="$HOME/.local/bin:$PATH"
 fi
 
-# Google Cloud SDK — system install at /usr/lib/google-cloud-sdk
-# (the old ~/google-cloud-sdk paths were stale and never loaded).
-# path.bash.inc isn't shipped for the system install; /usr/bin/gcloud
-# is already on PATH, so only completion needs sourcing here.
-if [ -f '/usr/lib/google-cloud-sdk/path.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/path.bash.inc'; fi
-if [ -f '/usr/lib/google-cloud-sdk/completion.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/completion.bash.inc'; fi
+# Google Cloud SDK — the user install in ~/google-cloud-sdk (from the
+# gcloud installer). It puts gcloud on PATH and loads its completion.
+if [ -f "$HOME/google-cloud-sdk/path.bash.inc" ]; then . "$HOME/google-cloud-sdk/path.bash.inc"; fi
+if [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ]; then . "$HOME/google-cloud-sdk/completion.bash.inc"; fi
 
 # The shared riff (Cloud Run)
 export RIFF_SERVER=https://riff-server-816917641970.us-central1.run.app
