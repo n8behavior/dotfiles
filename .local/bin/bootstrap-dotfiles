@@ -182,9 +182,6 @@ restore-secrets() {
     echo "SKIPPING: GitHub CLI token (already logged in)"
   fi
 
-  echo "Restoring Claude Code credentials..."
-  restore-secret claude/credentials ~/.claude/.credentials.json
-
   # FIDO2 PAM mapping, absent until the first key is enrolled.
   mkdir -p ~/.config/Yubico && chmod 700 ~/.config/Yubico
   restore-secret yubico/u2f_keys ~/.config/Yubico/u2f_keys

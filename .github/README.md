@@ -14,7 +14,8 @@
 
 ## Setup without Recovery Drive
 
-`gh` will need authorized with `gh auth token` and SSH and GPG keys will be missing
+Without the drive there are no secrets to restore: authorize `gh` with
+`gh auth login`, and expect the SSH and GPG keys to be missing.
 
 ```
 sudo apt update && sudo apt install -y git
@@ -57,9 +58,8 @@ is what a `push` would send.
 `~/.local/state/bootstrap-secrets/`, which version of each ciphertext it last
 wrote and the mtime it left on the file. On a re-run it decrypts an entry only
 when the store has moved on, and refuses when the local file has changed since
-it was restored — a rotated `~/.claude/.credentials.json` or an appended
-`~/.ssh/known_hosts` is kept, with the `passage insert` needed to save it
-printed alongside. A re-run against an unchanged store therefore costs no
+it was restored — an appended `~/.ssh/known_hosts` is kept, with the
+`passage insert` needed to save it printed alongside. A re-run against an unchanged store therefore costs no
 YubiKey touches at all.
 
 `bootstrap-dotfiles` restores whenever the drive is mounted and delegates the
