@@ -24,6 +24,9 @@ fi
 log "next boot: Windows Boot Manager (Boot$entry)"
 efibootmgr --bootnext "$entry" >/dev/null
 
-log "rebooting in 3s — Ctrl-C to cancel (BootNext stays set until next boot)"
+log "rebooting in 3s, past any inhibitors — Ctrl-C to cancel (BootNext stays set until next boot)"
 sleep 3
-systemctl reboot
+# Past inhibitors: Ptyxis blocks logout while any tab runs a foreground process,
+# and this script is one, so a plain reboot is always refused under GNOME. The
+# countdown above is the chance to back out.
+systemctl reboot --check-inhibitors=no
