@@ -21,7 +21,7 @@ install-common-packages() {
   # gnome-terminal is not the default from 26.04 (Ptyxis is), but it is the one
   # setup-gnome-terminal-gruvbox and theme-sync configure. openssh-server is not in
   # a desktop install; setup-fido-login hardens it after it lands here.
-  sudo apt install -y xclip build-essential gnupg curl tmux tree git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc gnome-terminal openssh-server
+  sudo apt install -y xclip build-essential gnupg curl tmux tree ripgrep git{,-lfs,-extras} etckeeper software-properties-common fuse2fs pcscd libpcsclite-dev pkgconf sassc gnome-terminal openssh-server
   sudo apt remove -y nano
   git lfs install
 }
@@ -477,7 +477,26 @@ setup-dotfiles() {
   rm -rf /tmp/dotfiles
 }
 
+# Repos live at ~/src/<owner>/<repo>, the layout the gh() wrapper in
+# .bash_functions takes its default owner and repo from. Give every owner a
+# directory: the account itself and each org it belongs to. That needs gh to be
+# logged in - restore-secrets does it from the Recovery drive, `gh auth login`
+# without one - so with no login only ~/src itself is made.
+setup-src() {
+  echo 'SETTING UP: ~/src owner directories'
+  mkdir -p ~/src
+  local login orgs owner
+  if ! login=$(gh api user --jq .login) || ! orgs=$(gh org list --limit 100); then
+    echo "SKIPPING: ~/src owners (gh not logged in; gh auth login, then re-run)"
+    return 0
+  fi
+  for owner in $login $orgs; do
+    mkdir -pv "$HOME/src/$owner"
+  done
+}
+
 setup-dotfiles
+setup-src
 
 # Ensure paths are available for rest of script (dotfiles may have updated .bashrc)
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
