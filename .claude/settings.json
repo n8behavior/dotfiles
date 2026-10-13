@@ -56,12 +56,6 @@
     ],
     "defaultMode": "auto",
     "deny": [
-      "Bash(git push * main)",
-      "Bash(git push * main *)",
-      "Bash(git push *:main)",
-      "Bash(git push *:main *)",
-      "Bash(git push *:refs/heads/main)",
-      "Bash(git push *:refs/heads/main *)",
       "Bash(gh pr merge *--admin*)"
     ]
   },

@@ -28,6 +28,7 @@
 !.config/wireplumber/bluetooth.lua.d/**
 !.claude/
 !.claude/settings.json
+!/CLAUDE.md
 !.cvsignore
 !.dircolors
 !/.gitattributes
