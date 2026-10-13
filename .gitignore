@@ -30,6 +30,7 @@
 !.claude/settings.json
 !.cvsignore
 !.dircolors
+!/.gitattributes
 !.gitconfig
 !.github/
 !.github/README.md

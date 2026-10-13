@@ -1,10 +1,48 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "agentPushNotifEnabled": true,
+  "alwaysThinkingEnabled": true,
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
   "env": {
     "BASH_ENV": "/home/sandman/.bash_functions",
     "CLAUDE_CODE_TMPDIR": "/home/sandman/.cache/claude-tmp"
   },
+  "extraKnownMarketplaces": {
+    "riff": {
+      "source": {
+        "path": "/home/sandman/.local/share/riff/claude-plugin",
+        "source": "directory"
+      }
+    }
+  },
+  "feedbackSurveyState": {
+    "lastShownTime": 1754015932533
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [],
+        "matcher": ""
+      }
+    ]
+  },
   "includeCoAuthoredBy": false,
+  "mcpServers": {
+    "github": {
+      "args": [
+        "-c",
+        "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
+      ],
+      "command": "bash"
+    }
+  },
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
+    }
+  },
   "permissions": {
     "allow": [
       "mcp__plugin_riff_riff",
@@ -16,6 +54,7 @@
       "Bash(gh pr view *)",
       "Bash(gh api repos/n8behavior/dotfiles/statuses/*)"
     ],
+    "defaultMode": "auto",
     "deny": [
       "Bash(git push * main)",
       "Bash(git push * main *)",
@@ -24,54 +63,15 @@
       "Bash(git push *:refs/heads/main)",
       "Bash(git push *:refs/heads/main *)",
       "Bash(gh pr merge *--admin*)"
-    ],
-    "defaultMode": "auto"
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": []
-      }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "riff statusline"
-  },
-  "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true
-  },
-  "extraKnownMarketplaces": {
-    "riff": {
-      "source": {
-        "source": "directory",
-        "path": "/home/sandman/.local/share/riff/claude-plugin"
-      }
-    }
-  },
-  "alwaysThinkingEnabled": true,
-  "tui": "default",
-  "skipWorkflowUsageWarning": true,
-  "theme": "auto",
   "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
-  "voiceEnabled": true,
-  "feedbackSurveyState": {
-    "lastShownTime": 1754015932533
+  "skipWorkflowUsageWarning": true,
+  "statusLine": {
+    "command": "riff statusline",
+    "type": "command"
   },
-  "mcpServers": {
-    "github": {
-      "command": "bash",
-      "args": [
-        "-c",
-        "source ~/.bashrc && GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_TOKEN\" /home/sandman/.local/bin/github-mcp-server stdio"
-      ]
-    }
-  },
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "xhigh"
-    }
-  }
+  "theme": "auto",
+  "tui": "default",
+  "voiceEnabled": true
 }

@@ -34,3 +34,5 @@
 	required = true
 [safe]
 	directory = /home/jack/mnt/ha
+[filter "sortjson"]
+	clean = jq -S .

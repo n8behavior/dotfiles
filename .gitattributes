@@ -1,0 +1,4 @@
+# Claude Code rewrites its settings in whatever key order it likes, so a save
+# that changes nothing still shows as a change. Store the file with sorted keys;
+# the sortjson filter is defined in .gitconfig.
+.claude/settings.json filter=sortjson

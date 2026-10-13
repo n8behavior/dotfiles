@@ -31,6 +31,12 @@ git restore .
 All paths in the `worktree` are ignored by default and must be explicitly
 added in the `.gitignore`.
 
+`.claude/settings.json` is stored with its keys sorted. Claude Code rewrites
+the whole file in its own key order whenever it saves a setting, so the
+`sortjson` filter (named in `.gitattributes`, defined in `.gitconfig`) passes it
+through `jq -S` on the way into git: a reshuffle is not a change, and
+`git diff` shows only real edits. The file on disk keeps Claude Code's order.
+
 After pushing, refresh the backup clone on the Recovery drive:
 
 ```
