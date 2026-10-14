@@ -37,6 +37,12 @@ the whole file in its own key order whenever it saves a setting, so the
 through `jq -S` on the way into git: a reshuffle is not a change, and
 `git diff` shows only real edits. The file on disk keeps Claude Code's order.
 
+Claude Code never saves a "trust this folder" answer given in the home
+directory, so it asks on every launch there. `trust-claude-home` in
+`bootstrap-dotfiles` sets `projects["$HOME"].hasTrustDialogAccepted` in
+`~/.claude.json` instead, which Claude Code honours. That trust also covers any
+subdirectory that is not a git repo of its own; repos under `~/src` still ask.
+
 After pushing, refresh the backup clone on the Recovery drive:
 
 ```

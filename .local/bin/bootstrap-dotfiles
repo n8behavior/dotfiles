@@ -370,6 +370,22 @@ setup-unifi-mcp() {
   claude mcp add --scope user unifi -- "$HOME/.local/bin/unifi-mcp"
 }
 
+trust-claude-home() {
+  echo 'TRUSTING: the home directory in Claude Code'
+  # Claude Code never saves a "trust this folder" answer given in the home
+  # directory, so it asks on every launch here. It does honour the flag when it
+  # is already in the config, so write it there. That trust also covers
+  # subdirectories that are not git repos of their own.
+  local config="$HOME/.claude.json" tmp
+  if [ "$(jq --arg home "$HOME" '.projects[$home].hasTrustDialogAccepted' "$config" 2>/dev/null)" = true ]; then
+    echo "home directory already trusted"
+    return 0
+  fi
+  [ -e "$config" ] || echo '{}' > "$config"
+  tmp=$(mktemp "$config.XXXXXX")
+  jq --arg home "$HOME" '.projects[$home].hasTrustDialogAccepted = true' "$config" > "$tmp" && mv "$tmp" "$config"
+}
+
 setup-gnome-terminal-gruvbox() {
   type -p dconf || return 0
 
@@ -523,6 +539,7 @@ setup-terminal
 setup-power-profile-sync
 install-claude-code
 setup-unifi-mcp
+trust-claude-home
 cargo install aichat
 
 # No-ops until a key is enrolled with enroll-fido-key
