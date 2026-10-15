@@ -190,6 +190,16 @@ also needs an age identity for passage — see the Recovery drive's README.
   `setup-fido-login` drops in `PasswordAuthentication no`. Pubkey auth is
   unaffected. `bootstrap-dotfiles` installs `openssh-server` first, since a
   desktop install lacks it and the step is skipped without it.
+- **Pubkey is then the only way in.** Every machine restores the same
+  `ssh/id_ed25519` from passage, and `restore-secrets` adds its public half to
+  `~/.ssh/authorized_keys`, so each machine accepts the others. A machine
+  installed without it refuses them all with `Permission denied (publickey)`.
+- **Reinstalling a machine changes its host keys.** The others then refuse it
+  with `REMOTE HOST IDENTIFICATION HAS CHANGED`, and so does every later
+  restore of `ssh/known_hosts`. Replace the entry everywhere and update the
+  store copy, which needs no touch, since encrypting uses public keys only:
+  `ssh-keygen -R <host>`, connect once to accept the new key, then
+  `passage insert -m -f ssh/known_hosts < ~/.ssh/known_hosts && sync-secrets push`.
 - **`NOPASSWD` in sudoers bypasses PAM entirely.** `sudo` then never consults
   `pam_u2f`, so no touch, no PIN. Keep `/etc/sudoers.d/sandman` renamed to
   `sandman.disabled` (sudo skips filenames containing a dot).
