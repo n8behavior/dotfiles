@@ -165,3 +165,9 @@ if [ -f '/usr/lib/google-cloud-sdk/completion.bash.inc' ]; then . '/usr/lib/goog
 
 # The shared riff (Cloud Run)
 export RIFF_SERVER=https://riff-server-816917641970.us-central1.run.app
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/home/sandman/google-cloud-sdk/path.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/path.bash.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/home/sandman/google-cloud-sdk/completion.bash.inc' ]; then . '/home/sandman/google-cloud-sdk/completion.bash.inc'; fi
