@@ -3,6 +3,7 @@
   "agentPushNotifEnabled": true,
   "alwaysThinkingEnabled": true,
   "enabledPlugins": {
+    "riff@riff": true,
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "env": {
@@ -52,7 +53,17 @@
       "Bash(gh pr merge * --auto --squash)",
       "Bash(gh pr comment *)",
       "Bash(gh pr view *)",
-      "Bash(gh api repos/n8behavior/dotfiles/statuses/*)"
+      "Bash(gh api repos/n8behavior/dotfiles/statuses/*)",
+      "Bash(riff *)",
+      "Bash(~/.cache/riff/check/target/static/release/riff *)",
+      "Bash(/home/sandman/.cache/riff/check/target/static/release/riff *)",
+      "Bash(gh pr merge --auto --squash *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue comment *)",
+      "Bash(gh issue edit *)"
     ],
     "defaultMode": "auto",
     "deny": [
