@@ -68,7 +68,8 @@
     "defaultMode": "auto",
     "deny": [
       "Bash(gh pr merge *--admin*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "remoteControlAtStartup": true,
   "skipWorkflowUsageWarning": true,
