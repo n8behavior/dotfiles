@@ -9,14 +9,6 @@
     "BASH_ENV": "/home/sandman/.bash_functions",
     "CLAUDE_CODE_TMPDIR": "/home/sandman/.cache/claude-tmp"
   },
-  "extraKnownMarketplaces": {
-    "riff": {
-      "source": {
-        "path": "/home/sandman/.local/share/riff/claude-plugin",
-        "source": "directory"
-      }
-    }
-  },
   "feedbackSurveyState": {
     "lastShownTime": 1754015932533
   },
@@ -45,17 +37,11 @@
   },
   "permissions": {
     "allow": [
-      "mcp__plugin_riff_riff",
-      "mcp__riff",
-      "Bash(riff)",
       "Bash(gh pr create *)",
       "Bash(gh pr merge * --auto --squash)",
       "Bash(gh pr comment *)",
       "Bash(gh pr view *)",
       "Bash(gh api repos/n8behavior/dotfiles/statuses/*)",
-      "Bash(riff *)",
-      "Bash(~/.cache/riff/check/target/static/release/riff *)",
-      "Bash(/home/sandman/.cache/riff/check/target/static/release/riff *)",
       "Bash(gh pr merge --auto --squash *)",
       "Bash(gh pr checks *)",
       "Bash(gh issue view *)",
@@ -71,10 +57,6 @@
   },
   "remoteControlAtStartup": true,
   "skipWorkflowUsageWarning": true,
-  "statusLine": {
-    "command": "riff statusline",
-    "type": "command"
-  },
   "theme": "auto",
   "tui": "default",
   "voiceEnabled": true
