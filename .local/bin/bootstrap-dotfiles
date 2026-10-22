@@ -218,6 +218,25 @@ install-github-cli() {
   sudo apt install gh -y
 }
 
+install-gcloud() {
+  echo 'INSTALLING: Google Cloud CLI'
+  type -p gpg || install-common-packages
+  # The deb rather than the snap or tarball: .bashrc sources completion from
+  # /usr/lib/google-cloud-sdk, which is where the deb puts it. A package install
+  # disables `gcloud components update`, so apt keeps it current, and the
+  # dist-upgrade at the top of this script does that on every later run. The
+  # key and source are rewritten each time so a rotated key is picked up, and
+  # the update that follows lets a first run install from the new source.
+  local keyring=/usr/share/keyrings/cloud.google.gpg
+  curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor --yes -o "$keyring"
+  echo "deb [signed-by=$keyring] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+  sudo apt update
+  local current
+  current=$(dpkg-query -W -f '${Version}' google-cloud-cli 2>/dev/null || true)
+  sudo apt install -y google-cloud-cli
+  echo "gcloud $(dpkg-query -W -f '${Version}' google-cloud-cli) installed (was: ${current:-none})"
+}
+
 install-nvm() {
   local version=$(gh release --repo nvm-sh/nvm view | head -n1 | awk '{print $2}')
   echo "INSTALLING: Node Version Manager (${version}"
@@ -543,6 +562,7 @@ install-nvm
 install-fzf
 install-golang
 install-go-unifi-mcp
+install-gcloud
 setup-editor
 install-lazyvim
 setup-terminal
