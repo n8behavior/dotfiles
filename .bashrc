@@ -162,6 +162,3 @@ fi
 # is already on PATH, so only completion needs sourcing here.
 if [ -f '/usr/lib/google-cloud-sdk/path.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/path.bash.inc'; fi
 if [ -f '/usr/lib/google-cloud-sdk/completion.bash.inc' ]; then . '/usr/lib/google-cloud-sdk/completion.bash.inc'; fi
-
-# The shared riff (Cloud Run)
-export RIFF_SERVER=https://riff-server-816917641970.us-central1.run.app
