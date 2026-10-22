@@ -3,7 +3,6 @@
   "agentPushNotifEnabled": true,
   "alwaysThinkingEnabled": true,
   "enabledPlugins": {
-    "riff@riff": true,
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "env": {
