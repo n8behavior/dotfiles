@@ -466,6 +466,10 @@ setup-power-profile-sync() {
 setup-terminal() {
   # Set caps lock as ctrl (desktop only)
   type -p dconf && dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:ctrl_modifier']"
+  # Let `sudo poweroff` work from a Ptyxis tab. Ptyxis blocks logout while a tab
+  # runs a foreground process (the sudo itself is one), gnome-session turns that
+  # into a block on shutdown, and since systemd 257 root obeys it too.
+  type -p dconf && dconf write /org/gnome/Ptyxis/inhibit-logout false
   type -p starship || {
     echo "INSTALLING: Starship cross-shell prompt"
     curl -sS https://starship.rs/install.sh | sh -s -- -y

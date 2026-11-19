@@ -26,7 +26,8 @@ efibootmgr --bootnext "$entry" >/dev/null
 
 log "rebooting in 3s, past any inhibitors — Ctrl-C to cancel (BootNext stays set until next boot)"
 sleep 3
-# Past inhibitors: Ptyxis blocks logout while any tab runs a foreground process,
-# and this script is one, so a plain reboot is always refused under GNOME. The
-# countdown above is the chance to back out.
+# Past inhibitors: any app that blocks logout (Ptyxis does while a tab runs a
+# foreground process, unless bootstrap-dotfiles turned that off) makes
+# gnome-session refuse a plain reboot. The countdown above is the chance to back
+# out.
 systemctl reboot --check-inhibitors=no
